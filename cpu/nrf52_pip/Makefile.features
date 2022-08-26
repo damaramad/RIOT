@@ -3,7 +3,7 @@ CPU_CORE = cortex-m4f
 else
 CPU_CORE = cortex-m4
 endif
-CPU_FAM  = nrf52
+CPU_FAM  = nrf52_pip
 
 # The 802.15.4 radio is not available on all SoCs
 ifneq (,$(filter nrf52811xxaa nrf52820xxaa nrf52833xxaa nrf52840xxaa,$(CPU_MODEL)))
@@ -25,4 +25,4 @@ FEATURES_PROVIDED += cortexm_mpu
 
 FEATURES_PROVIDED += periph_i2c_reconfigure
 
-include $(RIOTCPU)/nrf5x_common/Makefile.features
+include $(RIOTCPU)/nrf5x_common_pip/Makefile.features

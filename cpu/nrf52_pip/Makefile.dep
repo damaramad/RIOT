@@ -22,5 +22,5 @@ ifneq (,$(filter periph_uart_nonblocking,$(USEMODULE)))
   USEMODULE += tsrb
 endif
 
-include $(RIOTCPU)/nrf5x_common/Makefile.dep
-include $(RIOTCPU)/cortexm_common/Makefile.dep
+include $(RIOTCPU)/nrf5x_common_pip/Makefile.dep
+include $(RIOTCPU)/cortexm_common_pip/Makefile.dep

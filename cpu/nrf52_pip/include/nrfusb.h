@@ -8,7 +8,7 @@
 
 /**
  * @defgroup    cpu_nrf52_nrfusb NRF usb peripheral implementation
- * @ingroup     cpu_nrf52
+ * @ingroup     cpu_nrf52_pip
  * @brief       Minimal driver for the NRF52840 usb peripheral
  *
  * @{
