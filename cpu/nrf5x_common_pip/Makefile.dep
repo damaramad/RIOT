@@ -1,5 +1,5 @@
 # include nrf5x common periph drivers
-USEMODULE += nrf5x_common_periph
+USEMODULE += nrf5x_common_pip_periph
 
 # link common cpu code
 USEMODULE += cpu_common

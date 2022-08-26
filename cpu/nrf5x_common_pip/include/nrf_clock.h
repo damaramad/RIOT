@@ -7,7 +7,7 @@
  */
 
 /**
- * @ingroup     cpu_nrf5x_common
+ * @ingroup     cpu_nrf5x_common_pip
  * @{
  *
  * @file

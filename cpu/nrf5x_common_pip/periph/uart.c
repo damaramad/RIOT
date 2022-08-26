@@ -11,7 +11,7 @@
  */
 
 /**
- * @ingroup     cpu_nrf5x_common
+ * @ingroup     cpu_nrf5x_common_pip
  * @ingroup     drivers_periph_uart
  * @{
  *

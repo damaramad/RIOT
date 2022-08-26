@@ -4,7 +4,7 @@
 # General Public License v2.1. See the file LICENSE in the top level
 # directory for more details.
 
-config CPU_COMMON_NRF5X
+config CPU_COMMON_NRF5X_PIP
     bool
     select HAS_BLE_NIMBLE
     select HAS_PERIPH_CPUID
@@ -55,4 +55,4 @@ config HAS_VDD_LC_FILTER_REG1
         Indicates that a board is equipped with an external LC filter circuit
         attached to the CPUs voltage regulator stage 1.
 
-source "$(RIOTCPU)/cortexm_common/Kconfig"
+source "$(RIOTCPU)/cortexm_common_pip/Kconfig"
