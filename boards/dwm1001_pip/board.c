@@ -7,7 +7,7 @@
  */
 
 /**
- * @ingroup     boards_dwm1001
+ * @ingroup     boards_dwm1001_pip
  * @{
  *
  * @file

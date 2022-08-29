@@ -2,5 +2,5 @@ ifneq (,$(filter saul_default,$(USEMODULE)))
   USEMODULE += lis2dh12
 endif
 
-# include common nrf52 dependencies
-include $(RIOTBOARD)/common/nrf52/Makefile.dep
+# include common nrf52_pip dependencies
+include $(RIOTBOARD)/common/nrf52_pip/Makefile.dep
