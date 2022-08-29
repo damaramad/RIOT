@@ -1,8 +1,8 @@
 # Tell the build system that the CPU depends on the Cortex-M common files:
-USEMODULE += cortexm_common
+USEMODULE += cortexm_common_pip
 
 # include common periph code
-USEMODULE += cortexm_common_periph
+USEMODULE += cortexm_common_pip_periph
 
 FEATURES_REQUIRED_ANY += newlib|picolibc
 ifneq (,$(filter newlib,$(USEMODULE)))

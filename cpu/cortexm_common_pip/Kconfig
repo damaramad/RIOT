@@ -4,7 +4,7 @@
 # General Public License v2.1. See the file LICENSE in the top level
 # directory for more details.
 
-config MODULE_CORTEXM_COMMON
+config MODULE_CORTEXM_COMMON_PIP
     bool
     default y if CPU_CORE_CORTEX_M
     depends on TEST_KCONFIG

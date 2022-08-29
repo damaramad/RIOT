@@ -7,7 +7,7 @@
  */
 
 /**
- * @ingroup     cpu_cortexm_common
+ * @ingroup     cpu_cortexm_common_pip
  * @{
  *
  * @file
@@ -103,7 +103,7 @@ extern "C" {
  * # define CPU_CORTEXM_PENDSV_IRQ_PRIO   (CPU_DEFAULT_IRQ_PRIO + 1U)
  * @endcode
  *
- * See cpu/cortexm_common/cortexm_init.c how these are used.
+ * See cpu/cortexm_common_pip/cortexm_init.c how these are used.
  *
  * If you want to set this, define it in your `cpu_conf.h`.
  */
@@ -137,7 +137,7 @@ extern "C" {
  * For now, by default, we preserve the traditional RIOT behaviour, but
  * allow specific CPUs, boards, or apps to change this.
  *
- * See cpu/cortexm_common/cortexm_init.c how these are used.
+ * See cpu/cortexm_common_pip/cortexm_init.c how these are used.
  *
  * If you want to set this, define it in your `cpu_conf.h`.
  */

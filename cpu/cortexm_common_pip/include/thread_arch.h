@@ -8,7 +8,7 @@
  */
 
 /**
- * @ingroup     cpu_cortexm_common
+ * @ingroup     cpu_cortexm_common_pip
  * @{
  *
  * @file

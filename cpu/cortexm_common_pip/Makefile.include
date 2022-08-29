@@ -1,6 +1,6 @@
 # include module specific includes
-INCLUDES += -I$(RIOTCPU)/cortexm_common/include
-INCLUDES += -I$(RIOTCPU)/cortexm_common/include/vendor
+INCLUDES += -I$(RIOTCPU)/cortexm_common_pip/include
+INCLUDES += -I$(RIOTCPU)/cortexm_common_pip/include/vendor
 
 # All variables must be defined in the CPU configuration when using the common
 # `ldscripts/cortexm.ld`

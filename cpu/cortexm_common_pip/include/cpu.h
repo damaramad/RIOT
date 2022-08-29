@@ -7,7 +7,7 @@
  */
 
 /**
- * @defgroup    cpu_cortexm_common ARM Cortex-M common
+ * @defgroup    cpu_cortexm_common_pip ARM Cortex-M common
  * @ingroup     cpu
  * @brief       Common implementations and headers for Cortex-M family based
  *              micro-controllers
@@ -90,7 +90,7 @@ void cortexm_init(void);
 /**
  * @brief   Initialize Cortex-M FPU
  *
- * Called from `cpu/nrf52/cpu.c`, since it cannot use the
+ * Called from `cpu/nrf52_pip/cpu.c`, since it cannot use the
  * whole @ref cortexm_init due to conflicting requirements.
  *
  * Defined here as a static inline function to allow all
@@ -110,7 +110,7 @@ static inline void cortexm_init_fpu(void)
 /**
  * @brief   Initialize Cortex-M interrupt priorities
  *
- * Called from `cpu/nrf52/cpu.c`, since it cannot use the
+ * Called from `cpu/nrf52_pip/cpu.c`, since it cannot use the
  * whole @ref cortexm_init due to conflicting requirements.
  *
  * Define `CPU_CORTEXM_INIT_SUBFUNCTIONS` to make this function
@@ -121,7 +121,7 @@ void cortexm_init_isr_priorities(void);
 /**
  * @brief   Initialize Cortex-M misc functions
  *
- * Called from `cpu/nrf52/cpu.c`, since it cannot use the
+ * Called from `cpu/nrf52_pip/cpu.c`, since it cannot use the
  * whole @ref cortexm_init due to conflicting requirements.
  *
  * Define `CPU_CORTEXM_INIT_SUBFUNCTIONS` to make this function
