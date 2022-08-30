@@ -7,7 +7,7 @@
  */
 
 /**
- * @ingroup     boards_common_nrf52
+ * @ingroup     boards_common_nrf52_pip
  * @brief       Shared files and configuration for all nRF52 boards.
  * @{
  *

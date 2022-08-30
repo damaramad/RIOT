@@ -1,4 +1,4 @@
-CPU = nrf52
+CPU = nrf52_pip
 
 # Put defined MCU peripherals here (in alphabetical order)
 FEATURES_PROVIDED += periph_rtt
