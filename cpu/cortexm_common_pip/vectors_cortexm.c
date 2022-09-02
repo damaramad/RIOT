@@ -41,6 +41,8 @@
 #include "dbgpin.h"
 #endif
 
+#include "interface.h"
+
 #ifndef SRAM_BASE
 #define SRAM_BASE 0
 #endif
@@ -92,6 +94,19 @@ __attribute__((weak)) void pre_startup (void)
  */
 __attribute__((weak)) void post_startup (void)
 {
+}
+
+/**
+ * @brief   Function that will be called by the crt0.
+ */
+void start(interface_t *interface)
+{
+    /* Initialization of the heap */
+    extern void heap_init(void *start, void *end);
+    heap_init(interface->unusedRamStart, interface->ramEnd);
+
+    /* Call RIOT entry point */
+    reset_handler_default();
 }
 
 void reset_handler_default(void)
@@ -283,7 +298,7 @@ __attribute__((naked)) void hard_fault_default(void)
           : [sram]   "r" ((uintptr_t)&_sram + HARDFAULT_HANDLER_REQUIRED_STACK_SPACE),
             [eram]   "r" (&_eram),
             [estack] "r" (&_estack)
-          : "r0","r4","r5","r6","r8","r9","r10","r11","lr"
+          : "r0","r4","r5","r6","r8","r9","r11","lr"
     );
 }
 
