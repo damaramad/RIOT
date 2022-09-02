@@ -23,8 +23,9 @@ endif
 CFLAGS_LINK  = -ffunction-sections -fdata-sections -fno-builtin -fshort-enums
 CFLAGS_DBG  ?= -ggdb -g3
 CFLAGS_OPT  ?= -Os
+CFLAGS_PIC   = -msingle-pic-base -mpic-register=r10 -mno-pic-data-is-text-relative -fPIC
 
-CFLAGS += $(CFLAGS_CPU) $(CFLAGS_LINK) $(CFLAGS_DBG) $(CFLAGS_OPT)
+CFLAGS += $(CFLAGS_CPU) $(CFLAGS_LINK) $(CFLAGS_DBG) $(CFLAGS_OPT) $(CFLAGS_PIC)
 
 ASFLAGS += $(CFLAGS_CPU) $(CFLAGS_DBG)
 LINKFLAGS += -L$(RIOTCPU)/$(CPU)/ldscripts -L$(RIOTCPU)/cortexm_common_pip/ldscripts
@@ -33,6 +34,7 @@ LINKFLAGS += -T$(LINKER_SCRIPT) -Wl,--fatal-warnings
 
 LINKFLAGS += $(CFLAGS_CPU) $(CFLAGS_DBG) $(CFLAGS_OPT) -static -lgcc -nostartfiles
 LINKFLAGS += -Wl,--gc-sections
+LINKFLAGS += -Wl,-q
 
 # extract version inside the first parentheses
 ARM_GCC_VERSION = $(shell $(TARGET_ARCH)-gcc --version | sed -n '1 s/[^(]*(\([^\)]*\)).*/\1/p')
