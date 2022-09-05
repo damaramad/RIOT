@@ -9,3 +9,5 @@ else
   # include dependencies for BLE
   include $(RIOTBOARD)/common/nrf52_pip/Makefile.nimble.dep
 endif
+
+USEMODULE += libpip
