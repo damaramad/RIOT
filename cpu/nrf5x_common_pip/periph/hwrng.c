@@ -25,41 +25,46 @@
 #include "cpu.h"
 #include "periph/hwrng.h"
 #include "assert.h"
+#include "svc.h"
 
 void hwrng_init(void)
 {
     /* enable bias correction */
-    NRF_RNG->CONFIG = 1;
+    Pip_out(PIP_NRF_RNG_RNG_CONFIG, 1);
 }
 
 void hwrng_read(void *buf, unsigned int num)
 {
     unsigned int count = 0;
     uint8_t *b = (uint8_t *)buf;
+    uint32_t reg;
 
     /* power on RNG */
 #ifdef CPU_FAM_NRF51
     NRF_RNG->POWER = 1;
 #endif
-    NRF_RNG->INTENSET = RNG_INTENSET_VALRDY_Msk;
-    NRF_RNG->TASKS_START = 1;
+    Pip_out(PIP_NRF_RNG_RNG_INTENSET, RNG_INTENSET_VALRDY_Msk);
+    Pip_out(PIP_NRF_RNG_RNG_TASKS_START, 1);
 
     /* read the actual random data */
     while (count < num) {
         /* sleep until number is generated */
-        while (NRF_RNG->EVENTS_VALRDY == 0) {
+        Pip_in(PIP_NRF_RNG_RNG_EVENTS_VALRDY, &reg);
+        while (reg == 0) {
+            Pip_in(PIP_NRF_RNG_RNG_EVENTS_VALRDY, &reg);
             cortexm_sleep_until_event();
         }
 
-        b[count++] = (uint8_t)NRF_RNG->VALUE;
+        Pip_in(PIP_NRF_RNG_RNG_VALUE, &reg);
+        b[count++] = (uint8_t)reg;
         /* NRF51 PAN #21 -> read value before clearing VALRDY */
-        NRF_RNG->EVENTS_VALRDY = 0;
+        Pip_out(PIP_NRF_RNG_RNG_EVENTS_VALRDY, 0);
         NVIC_ClearPendingIRQ(RNG_IRQn);
     }
 
     /* power off RNG */
-    NRF_RNG->INTENCLR = RNG_INTENSET_VALRDY_Msk;
-    NRF_RNG->TASKS_STOP = 1;
+    Pip_out(PIP_NRF_RNG_RNG_INTENCLR, RNG_INTENSET_VALRDY_Msk);
+    Pip_out(PIP_NRF_RNG_RNG_TASKS_STOP, 1);
 #ifdef CPU_FAM_NRF51
     NRF_RNG->POWER = 0;
 #endif
