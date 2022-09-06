@@ -26,6 +26,7 @@
 #include "periph/wdt.h"
 
 #include "nrf_clock.h"
+#include "svc.h"
 
 #define ENABLE_DEBUG 0
 #include "debug.h"
@@ -51,7 +52,7 @@ void wdt_start(void)
 {
     DEBUG("[wdt] start watchdog\n");
 
-    NRF_WDT->TASKS_START = 1;
+    Pip_out(PIP_NRF_WDT_WDT_TASKS_START, 1);
 }
 
 void wdt_stop(void)
@@ -66,12 +67,13 @@ void wdt_kick(void)
 
     DEBUG("[wdt] reload the watchdog\n");
 
-    NRF_WDT->RR[0] = WDT_RR_RR_Reload;
+    Pip_out(PIP_NRF_WDT_WDT_RR_0, WDT_RR_RR_Reload);
 }
 
 void wdt_setup_reboot(uint32_t min_time, uint32_t max_time)
 {
     (void)min_time;
+    uint32_t reg;
 
     /* Windowed wdt not supported */
     assert(min_time == 0);
@@ -81,22 +83,33 @@ void wdt_setup_reboot(uint32_t min_time, uint32_t max_time)
            (max_time < NWDT_TIME_UPPER_LIMIT));
 
     /* configure watchdog behavior during sleep */
-    NRF_WDT->CONFIG &= ~(WDT_CONFIG_SLEEP_Msk << WDT_CONFIG_SLEEP_Pos);
-    NRF_WDT->CONFIG |= (NRF_WDT_SLEEP_MODE << WDT_CONFIG_SLEEP_Pos);
+    Pip_in(PIP_NRF_WDT_WDT_CONFIG, &reg);
+    reg &= ~(WDT_CONFIG_SLEEP_Msk << WDT_CONFIG_SLEEP_Pos);
+    Pip_out(PIP_NRF_WDT_WDT_CONFIG, reg);
+
+    Pip_in(PIP_NRF_WDT_WDT_CONFIG, &reg);
+    reg |= (NRF_WDT_SLEEP_MODE << WDT_CONFIG_SLEEP_Pos);
+    Pip_out(PIP_NRF_WDT_WDT_CONFIG, reg);
 
     /* configure watchdog behavior during debug */
-    NRF_WDT->CONFIG &= ~(WDT_CONFIG_HALT_Msk << WDT_CONFIG_HALT_Pos);
-    NRF_WDT->CONFIG |= (NRF_WDT_HALT_MODE << WDT_CONFIG_HALT_Pos);
+    Pip_in(PIP_NRF_WDT_WDT_CONFIG, &reg);
+    reg &= ~(WDT_CONFIG_HALT_Msk << WDT_CONFIG_HALT_Pos);
+    Pip_out(PIP_NRF_WDT_WDT_CONFIG, reg);
+
+    Pip_in(PIP_NRF_WDT_WDT_CONFIG, &reg);
+    reg |= (NRF_WDT_HALT_MODE << WDT_CONFIG_HALT_Pos);
+    Pip_out(PIP_NRF_WDT_WDT_CONFIG, reg);
 
     /* timeout (s) = (CRV + 1) / 32768 */
     uint32_t crv = ((max_time << 15) / 1000) - 1;
     DEBUG("[wdt] setting CRV to %"PRIu32"\n", crv);
-    NRF_WDT->CRV = crv;
+    Pip_out(PIP_NRF_WDT_WDT_CRV, crv);
 
-    DEBUG("[wdt] CRV configuration: %"PRIu32"\n", NRF_WDT->CRV);
+    Pip_in(PIP_NRF_WDT_WDT_CRV, &reg);
+    DEBUG("[wdt] CRV configuration: %"PRIu32"\n", reg);
 
     /* Enable reload requests */
-    NRF_WDT->RREN = (WDT_RREN_RR0_Enabled << WDT_RREN_RR0_Pos);
+    Pip_out(PIP_NRF_WDT_WDT_RREN, (WDT_RREN_RR0_Enabled << WDT_RREN_RR0_Pos));
 
     DEBUG("[wdt] watchdog setup complete\n");
 }
@@ -117,7 +130,7 @@ void wdt_setup_reboot_with_callback(uint32_t min_time, uint32_t max_time,
     if (cb) {
         /* enable interrupt */
         NVIC_EnableIRQ(WDT_IRQn);
-        NRF_WDT->INTENSET = WDT_INTENSET_TIMEOUT_Enabled;
+        Pip_out(PIP_NRF_WDT_WDT_INTENSET, WDT_INTENSET_TIMEOUT_Enabled);
     }
 
     wdt_setup_reboot(min_time, max_time);
