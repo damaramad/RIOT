@@ -23,21 +23,29 @@
 #include "saul.h"
 #include "saul_reg.h"
 #include "phydat.h"
+#include "svc.h"
 
 void temperature_read(int16_t *temp)
 {
+    uint32_t reg;
+
     /* Start temperature measurement task */
-    NRF_TEMP->TASKS_START = 1;
+    Pip_out(PIP_NRF_TEMP_TEMP_TASKS_START, 1);
 
     /* Wait for temperature measurement to be ready */
-    while (!NRF_TEMP->EVENTS_DATARDY); /* takes 36us according to manual */
+    Pip_in(PIP_NRF_TEMP_TEMP_EVENTS_DATARDY, &reg);
+    /* takes 36us according to manual */
+    while (!reg) {
+        Pip_in(PIP_NRF_TEMP_TEMP_EVENTS_DATARDY, &reg);
+    }
 
     /* temperature is in 0.25°C step, so just divide by 4 */
-    *temp = (int16_t)NRF_TEMP->TEMP >> 2;
+    Pip_in(PIP_NRF_TEMP_TEMP_TEMP, &reg);
+    *temp = (int16_t)reg >> 2;
 
     /* Clear data ready bit and stop temperature measurement task */
-    NRF_TEMP->EVENTS_DATARDY = 0;
-    NRF_TEMP->TASKS_STOP = 1;
+    Pip_out(PIP_NRF_TEMP_TEMP_EVENTS_DATARDY, 0);
+    Pip_out(PIP_NRF_TEMP_TEMP_TASKS_STOP, 1);
 }
 
 static int _read_temperature(const void *dev, phydat_t *res)
