@@ -22,17 +22,24 @@
 #include "cpu.h"
 #include "assert.h"
 #include "periph/flashpage.h"
+#include "svc.h"
 
 void flashpage_erase(unsigned page)
 {
+    uint32_t reg;
+
     assert(page < (int)FLASHPAGE_NUMOF);
 
     uint32_t *page_addr = (uint32_t *)flashpage_addr(page);
 
     /* erase given page */
-    NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Een;
-    NRF_NVMC->ERASEPAGE = (uint32_t)page_addr;
-    while (NRF_NVMC->READY == 0) {}
+    Pip_out(PIP_NRF_NVMC_NVMC_CONFIG, NVMC_CONFIG_WEN_Een);
+    Pip_out(PIP_NRF_NVMC_NVMC_ERASEPAGE, (uint32_t)page_addr);
+
+    Pip_in(PIP_NRF_NVMC_NVMC_READY, &reg);
+    while (reg == 0) {
+        Pip_in(PIP_NRF_NVMC_NVMC_READY, &reg);
+    }
 }
 
 void flashpage_write(void *target_addr, const void *data, size_t len)
@@ -52,11 +59,11 @@ void flashpage_write(void *target_addr, const void *data, size_t len)
     uint32_t *page_addr = target_addr;
     const uint32_t *data_addr = data;
 
-    NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen;
+    Pip_out(PIP_NRF_NVMC_NVMC_CONFIG, NVMC_CONFIG_WEN_Wen);
     for (unsigned i = 0; i < (len / FLASHPAGE_WRITE_BLOCK_SIZE); i++) {
         *page_addr++ = data_addr[i];
     }
 
     /* finish up */
-    NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren;
+    Pip_out(PIP_NRF_NVMC_NVMC_CONFIG, NVMC_CONFIG_WEN_Ren);
 }
