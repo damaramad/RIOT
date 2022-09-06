@@ -34,6 +34,7 @@
 #include "periph/gpio.h"
 #include "periph_cpu.h"
 #include "periph_conf.h"
+#include "svc.h"
 
 #define PORT_BIT            (1 << 5)
 #define PIN_MASK            (0x1f)
@@ -66,9 +67,9 @@ static gpio_isr_ctx_t exti_chan[GPIOTE_CHAN_NUMOF];
 #endif /* MODULE_PERIPH_GPIO_IRQ */
 
 /**
- * @brief   Get the port's base address
+ * @brief   Get the port's base id
  */
-static inline NRF_GPIO_Type *port(gpio_t pin)
+static inline uint32_t port(gpio_t pin)
 {
 #if (CPU_FAM_NRF51)
     (void) pin;
@@ -77,7 +78,7 @@ static inline NRF_GPIO_Type *port(gpio_t pin)
     return (pin & PORT_BIT) ? NRF_P1 : NRF_P0;
 #else
     (void) pin;
-    return NRF_P0;
+    return PIP_NRF_GPIO_P0_BASE;
 #endif
 }
 
@@ -103,7 +104,7 @@ int gpio_init(gpio_t pin, gpio_mode_t mode)
         case GPIO_OUT:
             /* configure pin direction, input buffer, pull resistor state
              * and drive configuration */
-            port(pin)->PIN_CNF[pin_num(pin)] = mode;
+            Pip_out(port(pin) + PIP_NRF_GPIO_P0_PIN_CNF_0_INDEX + pin_num(pin), mode);
             break;
         default:
             return -1;
@@ -114,36 +115,45 @@ int gpio_init(gpio_t pin, gpio_mode_t mode)
 
 int gpio_read(gpio_t pin)
 {
-    if (port(pin)->DIR & (1 << pin_num(pin))) {
-        return (port(pin)->OUT & (1 << pin_num(pin))) ? 1 : 0;
+    uint32_t reg;
+
+    Pip_in(port(pin) + PIP_NRF_GPIO_P0_DIR_INDEX, &reg);
+    if (reg & (1 << pin_num(pin))) {
+        Pip_in(port(pin) + PIP_NRF_GPIO_P0_OUT_INDEX, &reg);
+        return (reg & (1 << pin_num(pin))) ? 1 : 0;
     }
     else {
-        return (port(pin)->IN & (1 << pin_num(pin))) ? 1 : 0;
+        Pip_in(port(pin) + PIP_NRF_GPIO_P0_IN_INDEX, &reg);
+        return (reg & (1 << pin_num(pin))) ? 1 : 0;
     }
 }
 
 void gpio_set(gpio_t pin)
 {
-    port(pin)->OUTSET = (1 << pin_num(pin));
+    Pip_out(port(pin) + PIP_NRF_GPIO_P0_OUTSET_INDEX, (1 << pin_num(pin)));
 }
 
 void gpio_clear(gpio_t pin)
 {
-    port(pin)->OUTCLR = (1 << pin_num(pin));
+    Pip_out(port(pin) + PIP_NRF_GPIO_P0_OUTCLR_INDEX, (1 << pin_num(pin)));
 }
 
 void gpio_toggle(gpio_t pin)
 {
-    port(pin)->OUT ^= (1 << pin_num(pin));
+    uint32_t reg;
+
+    Pip_in(port(pin) + PIP_NRF_GPIO_P0_OUT_INDEX, &reg);
+    reg ^= (1 << pin_num(pin));
+    Pip_out(port(pin) + PIP_NRF_GPIO_P0_OUT_INDEX, reg);
 }
 
 void gpio_write(gpio_t pin, int value)
 {
     if (value) {
-        port(pin)->OUTSET = (1 << pin_num(pin));
+        Pip_out(port(pin) + PIP_NRF_GPIO_P0_OUTSET_INDEX, (1 << pin_num(pin)));
     }
     else {
-        port(pin)->OUTCLR = (1 << pin_num(pin));
+        Pip_out(port(pin) + PIP_NRF_GPIO_P0_OUTCLR_INDEX, (1 << pin_num(pin)));
     }
 }
 
@@ -163,6 +173,7 @@ int gpio_init_int(gpio_t pin, gpio_mode_t mode, gpio_flank_t flank,
                   gpio_cb_t cb, void *arg)
 {
     uint8_t _pin_index = gpio_int_get_exti(pin);
+    uint32_t reg;
 
     /* New pin */
     if (_pin_index == 0xff) {
@@ -182,24 +193,33 @@ int gpio_init_int(gpio_t pin, gpio_mode_t mode, gpio_flank_t flank,
     /* set interrupt priority and enable global GPIOTE interrupt */
     NVIC_EnableIRQ(GPIOTE_IRQn);
     /* configure the GPIOTE channel: set even mode, pin and active flank */
-    NRF_GPIOTE->CONFIG[_pin_index] = (GPIOTE_CONFIG_MODE_Event |
+    Pip_out(PIP_NRF_GPIOTE_GPIOTE_CONFIG_0 + _pin_index, (GPIOTE_CONFIG_MODE_Event |
                              (pin_num(pin) << GPIOTE_CONFIG_PSEL_Pos) |
 #if GPIO_COUNT > 1
                              ((pin & PORT_BIT) << 8) |
 #endif
-                             (flank << GPIOTE_CONFIG_POLARITY_Pos));
+                             (flank << GPIOTE_CONFIG_POLARITY_Pos)));
     /* enable external interrupt */
-    NRF_GPIOTE->INTENSET |= (GPIOTE_INTENSET_IN0_Msk << _pin_index);
+    Pip_in(PIP_NRF_GPIOTE_GPIOTE_INTENSET, &reg);
+    reg |= (GPIOTE_INTENSET_IN0_Msk << _pin_index);
+    Pip_out(PIP_NRF_GPIOTE_GPIOTE_INTENSET, reg);
 
     return 0;
 }
 
 void gpio_irq_enable(gpio_t pin)
 {
+    uint32_t reg;
+
     for (unsigned int i = 0; i < _gpiote_next_index; i++) {
         if (_exti_pins[i] == pin) {
-            NRF_GPIOTE->CONFIG[i] |= GPIOTE_CONFIG_MODE_Event;
-            NRF_GPIOTE->INTENSET |= (GPIOTE_INTENSET_IN0_Msk << i);
+            Pip_in(PIP_NRF_GPIOTE_GPIOTE_CONFIG_0 + i, &reg);
+            reg |= GPIOTE_CONFIG_MODE_Event;
+            Pip_out(PIP_NRF_GPIOTE_GPIOTE_CONFIG_0 + i, reg);
+
+            Pip_in(PIP_NRF_GPIOTE_GPIOTE_INTENSET, &reg);
+            reg |= (GPIOTE_INTENSET_IN0_Msk << i);
+            Pip_out(PIP_NRF_GPIOTE_GPIOTE_INTENSET, reg);
             break;
         }
     }
@@ -207,11 +227,18 @@ void gpio_irq_enable(gpio_t pin)
 
 void gpio_irq_disable(gpio_t pin)
 {
+    uint32_t reg;
+
     for (unsigned int i = 0; i < _gpiote_next_index; i++) {
         if (_exti_pins[i] == pin) {
             /* Clear mode configuration: 00 = Disabled */
-            NRF_GPIOTE->CONFIG[i] &= ~(GPIOTE_CONFIG_MODE_Msk);
-            NRF_GPIOTE->INTENCLR = (GPIOTE_INTENCLR_IN0_Msk << i);
+            Pip_in(PIP_NRF_GPIOTE_GPIOTE_CONFIG_0 + i, &reg);
+            reg &= ~(GPIOTE_CONFIG_MODE_Msk);
+            Pip_out(PIP_NRF_GPIOTE_GPIOTE_CONFIG_0 + i, reg);
+
+            Pip_in(PIP_NRF_GPIOTE_GPIOTE_INTENCLR, &reg);
+            reg = (GPIOTE_INTENCLR_IN0_Msk << i);
+            Pip_out(PIP_NRF_GPIOTE_GPIOTE_INTENCLR, reg);
             break;
         }
     }
@@ -219,9 +246,12 @@ void gpio_irq_disable(gpio_t pin)
 
 void isr_gpiote(void)
 {
+    uint32_t reg;
+
     for (unsigned int i = 0; i < _gpiote_next_index; ++i) {
-        if (NRF_GPIOTE->EVENTS_IN[i] == 1) {
-            NRF_GPIOTE->EVENTS_IN[i] = 0;
+        Pip_in(PIP_NRF_GPIOTE_GPIOTE_EVENTS_IN_0 + i, &reg);
+        if (reg == 1) {
+            Pip_out(PIP_NRF_GPIOTE_GPIOTE_EVENTS_IN_0 + i, 0);
             exti_chan[i].cb(exti_chan[i].arg);
             break;
         }
