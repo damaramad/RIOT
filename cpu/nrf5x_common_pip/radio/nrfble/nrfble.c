@@ -30,6 +30,8 @@
 #include "nrfble.h"
 #include "net/netdev/ble.h"
 
+#include "svc.h"
+
 #define ENABLE_DEBUG            0
 #include "debug.h"
 
@@ -126,8 +128,8 @@ static const uint8_t _ble_chan_map[40] = {
 static void _enable(void)
 {
     clock_hfxo_request();
-    NRF_RADIO->EVENTS_DISABLED = 0;
-    NRF_RADIO->INTENSET = INT_EN;
+    Pip_out(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED, 0);
+    Pip_out(PIP_NRF_RADIO_RADIO_INTENSET, INT_EN);
 }
 
 /**
@@ -135,12 +137,18 @@ static void _enable(void)
  */
 static void _go_idle(void)
 {
+    uint32_t reg;
+
     if (!(_state & STATE_BUSY)) {
-        NRF_RADIO->INTENCLR = INT_DIS;
-        NRF_RADIO->SHORTS = 0;
-        NRF_RADIO->EVENTS_DISABLED = 0;
-        NRF_RADIO->TASKS_DISABLE = 1;
-        while (NRF_RADIO->EVENTS_DISABLED == 0) {}
+        Pip_out(PIP_NRF_RADIO_RADIO_INTENCLR, INT_DIS);
+        Pip_out(PIP_NRF_RADIO_RADIO_SHORTS, 0);
+        Pip_out(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED, 0);
+        Pip_out(PIP_NRF_RADIO_RADIO_TASKS_DISABLE, 1);
+
+        Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED, &reg);
+        while (reg == 0) {
+            Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED, &reg);
+	}
         clock_hfxo_release();
         _state = STATE_IDLE;
     }
@@ -155,13 +163,13 @@ static void _set_context(netdev_ble_ctx_t *ctx)
         assert(ctx->chan <= NRFBLE_CHAN_MAX);
 
         _ctx = ctx;
-        NRF_RADIO->FREQUENCY = _ble_chan_map[ctx->chan];
-        NRF_RADIO->PREFIX0 = ctx->aa.raw[3];
-        NRF_RADIO->BASE0   = (uint32_t)((ctx->aa.raw[0] << 8) |
+        Pip_out(PIP_NRF_RADIO_RADIO_FREQUENCY, _ble_chan_map[ctx->chan]);
+        Pip_out(PIP_NRF_RADIO_RADIO_PREFIX0, ctx->aa.raw[3]);
+        Pip_out(PIP_NRF_RADIO_RADIO_BASE0, (uint32_t)((ctx->aa.raw[0] << 8) |
                                         (ctx->aa.raw[1] << 16) |
-                                        (ctx->aa.raw[2] << 24));
-        NRF_RADIO->DATAWHITEIV = ctx->chan;
-        NRF_RADIO->CRCINIT = (ctx->crc & NETDEV_BLE_CRC_MASK);
+                                        (ctx->aa.raw[2] << 24)));
+        Pip_out(PIP_NRF_RADIO_RADIO_DATAWHITEIV, ctx->chan);
+        Pip_out(PIP_NRF_RADIO_RADIO_CRCINIT, (ctx->crc & NETDEV_BLE_CRC_MASK));
     }
     else {
         _go_idle();
@@ -170,7 +178,11 @@ static void _set_context(netdev_ble_ctx_t *ctx)
 
 static int16_t _nrfble_get_txpower(void)
 {
-    int8_t p = (int8_t)NRF_RADIO->TXPOWER;
+    uint32_t reg;
+    int8_t p;
+
+    Pip_in(PIP_NRF_RADIO_RADIO_TXPOWER, &reg);
+    int8_t p = (int8_t)reg;
     if (p < 0) {
         return (int16_t)(0xff00 | p);
     }
@@ -180,28 +192,28 @@ static int16_t _nrfble_get_txpower(void)
 static void _nrfble_set_txpower(int16_t power)
 {
     if (power > 2) {
-        NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Pos4dBm;
+        Pip(PIP_NRF_RADIO_RADIO_TXPOWER, RADIO_TXPOWER_TXPOWER_Pos4dBm);
     }
     else if (power > -2) {
-        NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_0dBm;
+        Pip(PIP_NRF_RADIO_RADIO_TXPOWER, RADIO_TXPOWER_TXPOWER_0dBm);
     }
     else if (power > -6) {
-        NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Neg4dBm;
+        Pip(PIP_NRF_RADIO_RADIO_TXPOWER, RADIO_TXPOWER_TXPOWER_Neg4dBm);
     }
     else if (power > -10) {
-        NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Neg8dBm;
+        Pip(PIP_NRF_RADIO_RADIO_TXPOWER, RADIO_TXPOWER_TXPOWER_Neg8dBm);
     }
     else if (power > -14) {
-        NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Neg12dBm;
+        Pip(PIP_NRF_RADIO_RADIO_TXPOWER, RADIO_TXPOWER_TXPOWER_Neg12dBm);
     }
     else if (power > -18) {
-        NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Neg16dBm;
+        Pip(PIP_NRF_RADIO_RADIO_TXPOWER,RADIO_TXPOWER_TXPOWER_Neg16dBm);
     }
     else if (power > -25) {
-        NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Neg20dBm;
+        Pip(PIP_NRF_RADIO_RADIO_TXPOWER, RADIO_TXPOWER_TXPOWER_Neg20dBm);
     }
     else {
-        NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Neg30dBm;
+        Pip(PIP_NRF_RADIO_RADIO_TXPOWER, RADIO_TXPOWER_TXPOWER_Neg30dBm);
     }
 }
 
@@ -210,17 +222,22 @@ static void _nrfble_set_txpower(int16_t power)
  */
 void isr_radio(void)
 {
-    if (NRF_RADIO->EVENTS_ADDRESS) {
-        NRF_RADIO->EVENTS_ADDRESS = 0;
+    uint32_t reg;
+
+    Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_ADDRESS, &reg);
+    if (reg) {
+        Pip_out(PIP_NRF_RADIO_RADIO_EVENTS_ADDRESS, 0);
         _state |= STATE_BUSY;
     }
 
-    if (NRF_RADIO->EVENTS_DISABLED) {
-        NRF_RADIO->EVENTS_DISABLED = 0;
+    Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED, &reg);
+    if (reg) {
+        Pip_out(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED, 0);
 
         if (_state == (STATE_BUSY | STATE_RX)) {
             _state = STATE_TX;
-            if (NRF_RADIO->CRCSTATUS) {
+            Pip_in(PIP_NRF_RADIO_RADIO_CRCSTATUS, &reg);
+            if (reg) {
                 _ctx->crc |= NETDEV_BLE_CRC_OK;
             }
             else {
@@ -251,31 +268,31 @@ static int _nrfble_init(netdev_t *dev)
     assert(_nrfble_dev.driver && _nrfble_dev.event_callback);
 
     /* power cycle the radio to reset it */
-    NRF_RADIO->POWER = 0;
-    NRF_RADIO->POWER = 1;
+    Pip_out(PIP_NRF_RADIO_RADIO_POWER, 0);
+    Pip_out(PIP_NRF_RADIO_RADIO_POWER, 1);
     /* configure variable parameters to default values */
-    NRF_RADIO->TXPOWER = NRFBLE_TXPOWER_DEFAULT;
+    Pip_out(PIP_NRF_RADIO_RADIO_TXPOWER, NRFBLE_TXPOWER_DEFAULT);
     /* always send from and listen to logical address 0 */
-    NRF_RADIO->TXADDRESS = 0x00UL;
-    NRF_RADIO->RXADDRESSES = 0x01UL;
+    Pip_out(PIP_NRF_RADIO_RADIO_TXADDRESS, 0x00UL);
+    Pip_out(PIP_NRF_RADIO_RADIO_RXADDRESSES, 0x01UL);
     /* load driver specific configuration */
-    NRF_RADIO->MODE = CONF_MODE;
+    Pip_out(PIP_NRF_RADIO_RADIO_MODE, CONF_MODE);
     /* configure data fields and packet length whitening and endianness */
-    NRF_RADIO->PCNF0 = ((CONF_S1 << RADIO_PCNF0_S1LEN_Pos) |
+    Pip_out(PIP_NRF_RADIO_RADIO_PCNF0, ((CONF_S1 << RADIO_PCNF0_S1LEN_Pos) |
                         (CONF_S0 << RADIO_PCNF0_S0LEN_Pos) |
-                        (CONF_LEN << RADIO_PCNF0_LFLEN_Pos));
-    NRF_RADIO->PCNF1 = ((CONF_WHITENING << RADIO_PCNF1_WHITEEN_Pos) |
+                        (CONF_LEN << RADIO_PCNF0_LFLEN_Pos)));
+    Pip_out(PIP_NRF_RADIO_RADIO_PCNF1, ((CONF_WHITENING << RADIO_PCNF1_WHITEEN_Pos) |
                         (CONF_ENDIAN << RADIO_PCNF1_ENDIAN_Pos) |
                         (CONF_BASE_ADDR_LEN << RADIO_PCNF1_BALEN_Pos) |
                         (CONF_STATLEN << RADIO_PCNF1_STATLEN_Pos) |
-                        (NETDEV_BLE_PDU_MAXLEN << RADIO_PCNF1_MAXLEN_Pos));
+                        (NETDEV_BLE_PDU_MAXLEN << RADIO_PCNF1_MAXLEN_Pos)));
     /* set inter frame spacing to 150us */
-    NRF_RADIO->TIFS = CONF_TIFS;
+    Pip_out(PIP_NRF_RADIO_RADIO_TIFS, CONF_TIFS);
     /* configure CRC length and polynomial */
-    NRF_RADIO->CRCCNF = CONF_CRC_LEN;
-    NRF_RADIO->CRCPOLY = CONF_CRC_POLY;
+    Pip_out(PIP_NRF_RADIO_RADIO_CRCCNF, CONF_CRC_LEN);
+    Pip_out(PIP_NRF_RADIO_RADIO_CRCPOLY, CONF_CRC_POLY);
     /* enable global interrupts, but mask all local interrupts for now */
-    NRF_RADIO->INTENCLR = 0xffffffff;
+    Pip_out(PIP_NRF_RADIO_RADIO_INTENCLR, 0xffffffff);
     NVIC_EnableIRQ(RADIO_IRQn);
 
     DEBUG("[nrfble] initialization successful\n");
@@ -287,14 +304,14 @@ static int _nrfble_send(netdev_t *dev, const iolist_t *data)
     (void)dev;
     assert(data);
 
-    NRF_RADIO->PACKETPTR = (uint32_t)data->iol_base;
-    NRF_RADIO->SHORTS = SHORTS_TX;
+    Pip_out(PIP_NRF_RADIO_RADIO_PACKETPTR, (uint32_t)data->iol_base);
+    Pip_out(PIP_NRF_RADIO_RADIO_SHORTS, SHORTS_TX);
 
     /* in case no trx sequence is active, we start a new one now */
     if (_state == STATE_IDLE) {
         _state = STATE_TX;
         _enable();
-        NRF_RADIO->TASKS_TXEN = 1;
+        Pip_out(PIP_NRF_RADIO_RADIO_TASKS_TXEN, 1);
     }
 
     return 0;
@@ -307,14 +324,14 @@ static int _nrfble_recv(netdev_t *dev, void *buf, size_t len, void *info)
     (void)info;
     assert(buf && (len == sizeof(netdev_ble_pkt_t)));
 
-    NRF_RADIO->PACKETPTR = (uint32_t)buf;
-    NRF_RADIO->SHORTS = SHORTS_RX;
+    Pip_out(PIP_NRF_RADIO_RADIO_PACKETPTR, (uint32_t)buf);
+    Pip_out(PIP_NRF_RADIO_RADIO_SHORTS, SHORTS_RX);
 
     /* in case no trx sequence is active, we start a new one now */
     if (_state == STATE_IDLE) {
         _state = STATE_RX;
         _enable();
-        NRF_RADIO->TASKS_RXEN = 1;
+        Pip_out(PIP_NRF_RADIO_RADIO_TASKS_RXEN, 1);
     }
 
     return 0;
