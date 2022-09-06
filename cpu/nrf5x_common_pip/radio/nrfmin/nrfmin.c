@@ -32,6 +32,8 @@
 #include "nrfmin.h"
 #include "net/netdev.h"
 
+#include "svc.h"
+
 #ifdef MODULE_GNRC_SIXLOWPAN
 #include "net/gnrc/nettype.h"
 #endif
@@ -138,10 +140,16 @@ static volatile uint8_t rx_lock = 0;
  */
 static void go_idle(void)
 {
+    uint32_t reg;
+
     /* set device into basic disabled state */
-    NRF_RADIO->EVENTS_DISABLED = 0;
-    NRF_RADIO->TASKS_DISABLE = 1;
-    while (NRF_RADIO->EVENTS_DISABLED == 0) {}
+    Pip_out(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED, 0);
+    Pip_out(PIP_NRF_RADIO_RADIO_TASKS_DISABLE, 1);
+
+    Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED, &reg);
+    while (reg == 0) {
+        Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED, &reg);
+    }
     /* also release any existing lock on the RX buffer */
     rx_lock = 0;
     state = STATE_IDLE;
@@ -156,22 +164,28 @@ static void go_idle(void)
  */
 static void goto_target_state(void)
 {
+    uint32_t reg;
+
     go_idle();
 
     if ((target_state == STATE_RX) && (rx_buf.pkt.hdr.len == 0)) {
         /* set receive buffer and our own address */
         rx_lock = 1;
-        NRF_RADIO->PACKETPTR = (uint32_t)(&rx_buf);
-        NRF_RADIO->BASE0 = (CONF_ADDR_BASE | my_addr);
+        Pip_out(PIP_NRF_RADIO_RADIO_PACKETPTR, (uint32_t)(&rx_buf));
+        Pip_out(PIP_NRF_RADIO_RADIO_BASE0, (CONF_ADDR_BASE | my_addr));
         /* goto RX mode */
-        NRF_RADIO->EVENTS_READY = 0;
-        NRF_RADIO->TASKS_RXEN = 1;
-        while (NRF_RADIO->EVENTS_READY == 0) {}
+        Pip_out(PIP_NRF_RADIO_RADIO_EVENTS_READY, 0);
+        Pip_out(PIP_NRF_RADIO_RADIO_TASKS_RXEN, 1);
+
+        Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_READY, &reg);
+        while (reg == 0) {
+            Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_READY, &reg);
+	}
         state = STATE_RX;
     }
 
     if (target_state == STATE_OFF) {
-        NRF_RADIO->POWER = 0;
+        Pip_out(PIP_NRF_RADIO_RADIO_POWER, 0);
         state = STATE_OFF;
     }
 }
@@ -190,7 +204,10 @@ uint16_t nrfmin_get_addr(void)
 
 uint16_t nrfmin_get_channel(void)
 {
-    return (uint16_t)(NRF_RADIO->FREQUENCY >> 2);
+    uint32_t reg;
+
+    Pip_in(PIP_NRF_RADIO_RADIO_FREQUENCY, &reg);
+    return (uint16_t)(reg >> 2);
 }
 
 netopt_state_t nrfmin_get_state(void)
@@ -206,7 +223,11 @@ netopt_state_t nrfmin_get_state(void)
 
 int16_t nrfmin_get_txpower(void)
 {
-    int8_t p = (int8_t)NRF_RADIO->TXPOWER;
+    uint32_t reg;
+    int8_t p;
+
+    Pip_in(PIP_NRF_RADIO_RADIO_TXPOWER, &reg);
+    int8_t p = (int8_t)p;
     if (p < 0) {
         return (int16_t)(0xff00 | p);
     }
@@ -225,7 +246,7 @@ int nrfmin_set_channel(uint16_t chan)
         return -EOVERFLOW;
     }
 
-    NRF_RADIO->FREQUENCY = (chan << 2);
+    Pip_out(PIP_NRF_RADIO_RADIO_FREQUENCY, (chan << 2));
     goto_target_state();
 
     return sizeof(uint16_t);
@@ -234,35 +255,35 @@ int nrfmin_set_channel(uint16_t chan)
 void nrfmin_set_txpower(int16_t power)
 {
     if (power > 2) {
-        NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Pos4dBm;
+        Pip_out(PIP_NRF_RADIO_RADIO_TXPOWER, RADIO_TXPOWER_TXPOWER_Pos4dBm);
     }
     else if (power > -2) {
-        NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_0dBm;
+        Pip_out(PIP_NRF_RADIO_RADIO_TXPOWER, RADIO_TXPOWER_TXPOWER_0dBm);
     }
     else if (power > -6) {
-        NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Neg4dBm;
+        Pip_out(PIP_NRF_RADIO_RADIO_TXPOWER, RADIO_TXPOWER_TXPOWER_Neg4dBm);
     }
     else if (power > -10) {
-        NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Neg8dBm;
+        Pip_out(PIP_NRF_RADIO_RADIO_TXPOWER, RADIO_TXPOWER_TXPOWER_Neg8dBm);
     }
     else if (power > -14) {
-        NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Neg12dBm;
+        Pip_out(PIP_NRF_RADIO_RADIO_TXPOWER, RADIO_TXPOWER_TXPOWER_Neg12dBm);
     }
     else if (power > -18) {
-        NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Neg16dBm;
+        Pip_out(PIP_NRF_RADIO_RADIO_TXPOWER, RADIO_TXPOWER_TXPOWER_Neg16dBm);
     }
     else if (power > -25) {
-        NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Neg20dBm;
+        Pip_out(PIP_NRF_RADIO_RADIO_TXPOWER, RADIO_TXPOWER_TXPOWER_Neg20dBm);
     }
     else {
-        NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Neg30dBm;
+        Pip_out(PIP_NRF_RADIO_RADIO_TXPOWER, RADIO_TXPOWER_TXPOWER_Neg30dBm);
     }
 }
 
 int nrfmin_set_state(netopt_state_t val)
 {
     /* make sure radio is turned on and no transmission is in progress */
-    NRF_RADIO->POWER = 1;
+    Pip_out(PIP_NRF_RADIO_RADIO_POWER, 1);
 
     switch (val) {
         case NETOPT_STATE_OFF:
@@ -289,14 +310,18 @@ int nrfmin_set_state(netopt_state_t val)
  */
 void isr_radio(void)
 {
-    if (NRF_RADIO->EVENTS_END == 1) {
-        NRF_RADIO->EVENTS_END = 0;
+    uint32_t reg;
+
+    Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_END, &reg);
+    if (reg == 1) {
+        Pip_out(PIP_NRF_RADIO_RADIO_EVENTS_END, 0);
         /* did we just send or receive something? */
         if (state == STATE_RX) {
             /* drop packet on invalid CRC */
-            if ((NRF_RADIO->CRCSTATUS != 1) || !(nrfmin_dev.event_callback)) {
+            Pip_in(PIP_NRF_RADIO_RADIO_CRCSTATUS, &reg);
+            if ((reg != 1) || !(nrfmin_dev.event_callback)) {
                 rx_buf.pkt.hdr.len = 0;
-                NRF_RADIO->TASKS_START = 1;
+                Pip_out(PIP_NRF_RADIO_RADIO_TASKS_START, 1);
             }
             else {
                 rx_lock = 0;
@@ -337,14 +362,18 @@ static int nrfmin_send(netdev_t *dev, const iolist_t *iolist)
 
     /* set output buffer and destination address */
     nrfmin_hdr_t *hdr = (nrfmin_hdr_t *)iolist->iol_base;
-    NRF_RADIO->PACKETPTR = (uint32_t)(&tx_buf);
-    NRF_RADIO->BASE0 = (CONF_ADDR_BASE | hdr->dst_addr);
+    Pip_out(PIP_NRF_RADIO_RADIO_PACKETPTR, (uint32_t)(&tx_buf));
+    Pip_out(PIP_NRF_RADIO_RADIO_BASE0, (CONF_ADDR_BASE | hdr->dst_addr));
 
     /* trigger the actual transmission */
     DEBUG("[nrfmin] send: putting %i byte into the ether\n", (int)hdr->len);
-    NRF_RADIO->EVENTS_READY = 0;
-    NRF_RADIO->TASKS_TXEN = 1;
-    while (NRF_RADIO->EVENTS_READY == 0) {}
+    Pip_out(PIP_NRF_RADIO_RADIO_EVENTS_READY, 0);
+    Pip_out(PIP_NRF_RADIO_RADIO_TASKS_TXEN, 1);
+
+    Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_READY, &reg);
+    while (reg == 0) {
+        Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_READY, &reg);
+    }
     state = STATE_TX;
 
     return (int)pos;
@@ -408,42 +437,42 @@ static int nrfmin_init(netdev_t *dev)
     clock_hfxo_request();
 
     /* power on the NRFs radio */
-    NRF_RADIO->POWER = 1;
+    Pip_out(PIP_NRF_RADIO_RADIO_POWER, 1);
     /* load driver specific configuration */
-    NRF_RADIO->MODE = CONF_MODE;
+    Pip_out(PIP_NRF_RADIO_RADIO_MODE, CONF_MODE);
     /* configure variable parameters to default values */
-    NRF_RADIO->TXPOWER = NRFMIN_TXPOWER_DEFAULT;
-    NRF_RADIO->FREQUENCY = NRFMIN_CHAN_DEFAULT;
+    Pip_out(PIP_NRF_RADIO_RADIO_TXPOWER, NRFMIN_TXPOWER_DEFAULT);
+    Pip_out(PIP_NRF_RADIO_RADIO_FREQUENCY, NRFMIN_CHAN_DEFAULT);
     /* pre-configure radio addresses */
-    NRF_RADIO->PREFIX0 = CONF_ADDR_PREFIX0;
-    NRF_RADIO->BASE0   = (CONF_ADDR_BASE | my_addr);
-    NRF_RADIO->BASE1   = CONF_ADDR_BCAST;
+    Pip_out(PIP_NRF_RADIO_RADIO_PREFIX0, CONF_ADDR_PREFIX0);
+    Pip_out(PIP_NRF_RADIO_RADIO_BASE0, (CONF_ADDR_BASE | my_addr));
+    Pip_out(PIP_NRF_RADIO_RADIO_BASE1, CONF_ADDR_BCAST);
     /* always send from logical address 0 */
-    NRF_RADIO->TXADDRESS = 0x00UL;
+    Pip_out(PIP_NRF_RADIO_RADIO_TXADDRESS, 0x00UL);
     /* and listen to logical addresses 0 and 1 */
     /* workaround errata nrf52832 3.41 [143] */
-    NRF_RADIO->RXADDRESSES = 0x10003UL;
+    Pip_out(PIP_NRF_RADIO_RADIO_RXADDRESSES, 0x10003UL);
     /* configure data fields and packet length whitening and endianness */
-    NRF_RADIO->PCNF0 = ((CONF_S1 << RADIO_PCNF0_S1LEN_Pos) |
+    Pip_out(PIP_NRF_RADIO_RADIO_PCNF0, ((CONF_S1 << RADIO_PCNF0_S1LEN_Pos) |
                         (CONF_S0 << RADIO_PCNF0_S0LEN_Pos) |
-                        (CONF_LEN << RADIO_PCNF0_LFLEN_Pos));
-    NRF_RADIO->PCNF1 = ((CONF_WHITENING << RADIO_PCNF1_WHITEEN_Pos) |
+                        (CONF_LEN << RADIO_PCNF0_LFLEN_Pos)));
+    Pip_out(PIP_NRF_RADIO_RADIO_PCNF1, ((CONF_WHITENING << RADIO_PCNF1_WHITEEN_Pos) |
                         (CONF_ENDIAN << RADIO_PCNF1_ENDIAN_Pos) |
                         (CONF_BASE_ADDR_LEN << RADIO_PCNF1_BALEN_Pos) |
                         (CONF_STATLEN << RADIO_PCNF1_STATLEN_Pos) |
-                        (NRFMIN_PKT_MAX << RADIO_PCNF1_MAXLEN_Pos));
+                        (NRFMIN_PKT_MAX << RADIO_PCNF1_MAXLEN_Pos)));
     /* configure the CRC unit, we skip the address field as this seems to lead
      * to wrong checksum calculation on nRF52 devices in some cases */
-    NRF_RADIO->CRCCNF = CONF_CRC_LEN | RADIO_CRCCNF_SKIPADDR_Msk;
-    NRF_RADIO->CRCPOLY = CONF_CRC_POLY;
-    NRF_RADIO->CRCINIT = CONF_CRC_INIT;
+    Pip_out(PIP_NRF_RADIO_RADIO_CRCCNF, CONF_CRC_LEN | RADIO_CRCCNF_SKIPADDR_Msk);
+    Pip_out(PIP_NRF_RADIO_RADIO_CRCPOLY, CONF_CRC_POLY);
+    Pip_out(PIP_NRF_RADIO_RADIO_CRCINIT, CONF_CRC_INIT);
     /* set shortcuts for more efficient transfer */
-    NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk;
+    Pip_out(PIP_NRF_RADIO_RADIO_SHORTS, RADIO_SHORTS_READY_START_Msk);
     /* enable interrupts */
     NVIC_EnableIRQ(RADIO_IRQn);
     /* enable END interrupt */
-    NRF_RADIO->EVENTS_END = 0;
-    NRF_RADIO->INTENSET = RADIO_INTENSET_END_Msk;
+    Pip_out(PIP_NRF_RADIO_RADIO_EVENTS_END, 0);
+    Pip_out(PIP_NRF_RADIO_RADIO_INTENSET, RADIO_INTENSET_END_Msk);
     /* put device in receive mode */
     target_state = STATE_RX;
     goto_target_state();
