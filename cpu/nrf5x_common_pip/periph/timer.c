@@ -24,6 +24,7 @@
  */
 
 #include "periph/timer.h"
+#include "svc.h"
 
 #define F_TIMER             (16000000U)     /* the timer is clocked at 16MHz */
 
@@ -39,7 +40,7 @@ typedef struct {
  */
 static tim_ctx_t ctx[TIMER_NUMOF];
 
-static inline NRF_TIMER_Type *dev(tim_t tim)
+static inline uint32_t dev(tim_t tim)
 {
     return timer_config[tim].dev;
 }
@@ -61,17 +62,17 @@ int timer_init(tim_t tim, uint32_t freq, timer_cb_t cb, void *arg)
 #endif
 
     /* reset and configure the timer */
-    dev(tim)->TASKS_STOP = 1;
-    dev(tim)->BITMODE = timer_config[tim].bitmode;
-    dev(tim)->MODE = TIMER_MODE_MODE_Timer;
-    dev(tim)->TASKS_CLEAR = 1;
+    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_TASKS_STOP_INDEX, 1);
+    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_BITMODE_INDEX, timer_config[tim].bitmode);
+    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_MODE_INDEX, TIMER_MODE_MODE_Timer);
+    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_TASKS_CLEAR_INDEX, 1);
 
     /* figure out if desired frequency is available */
     int i;
     unsigned long cando = F_TIMER;
     for (i = 0; i < 10; i++) {
         if (freq == cando) {
-            dev(tim)->PRESCALER = i;
+            Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_PRESCALER_INDEX, i);
             break;
         }
         cando /= 2;
@@ -81,14 +82,14 @@ int timer_init(tim_t tim, uint32_t freq, timer_cb_t cb, void *arg)
     }
 
     /* reset compare state */
-    dev(tim)->EVENTS_COMPARE[0] = 0;
-    dev(tim)->EVENTS_COMPARE[1] = 0;
-    dev(tim)->EVENTS_COMPARE[2] = 0;
+    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_EVENTS_COMPARE_0_INDEX, 0);
+    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_EVENTS_COMPARE_1_INDEX, 0);
+    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_EVENTS_COMPARE_2_INDEX, 0);
 
     /* enable interrupts */
     NVIC_EnableIRQ(timer_config[tim].irqn);
     /* start the timer */
-    dev(tim)->TASKS_START = 1;
+    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_TASKS_START_INDEX, 1);
 
     return 0;
 }
@@ -101,14 +102,16 @@ int timer_set_absolute(tim_t tim, int chan, unsigned int value)
     }
 
     ctx[tim].flags |= (1 << chan);
-    dev(tim)->CC[chan] = value;
-    dev(tim)->INTENSET = (TIMER_INTENSET_COMPARE0_Msk << chan);
+    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_CC_0_INDEX + chan, value);
+    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_INTENSET_INDEX, (TIMER_INTENSET_COMPARE0_Msk << chan));
 
     return 0;
 }
 
 int timer_set_periodic(tim_t tim, int chan, unsigned int value, uint8_t flags)
 {
+    uint32_t reg;
+
     /* see if channel is valid */
     if (chan >= timer_config[tim].channels) {
         return -1;
@@ -116,30 +119,36 @@ int timer_set_periodic(tim_t tim, int chan, unsigned int value, uint8_t flags)
 
     ctx[tim].flags |= (1 << chan);
     ctx[tim].is_periodic |= (1 << chan);
-    dev(tim)->CC[chan] = value;
+    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_CC_0_INDEX + chan, value);
     if (flags & TIM_FLAG_RESET_ON_MATCH) {
-        dev(tim)->SHORTS |= (1 << chan);
+        Pip_in(dev(tim) + PIP_NRF_TIMER_TIMER1_SHORTS_INDEX, &reg);
+        reg |= (1 << chan);
+        Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_SHORTS_INDEX, reg);
     }
     if (flags & TIM_FLAG_RESET_ON_SET) {
-        dev(tim)->TASKS_CLEAR = 1;
+        Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_TASKS_CLEAR_INDEX, 1);
     }
-    dev(tim)->INTENSET = (TIMER_INTENSET_COMPARE0_Msk << chan);
+    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_INTENSET_INDEX, (TIMER_INTENSET_COMPARE0_Msk << chan));
 
-    dev(tim)->TASKS_START = 1;
+    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_TASKS_START_INDEX, 1);
 
     return 0;
 }
 
 int timer_clear(tim_t tim, int chan)
 {
+    uint32_t reg;
+
     /* see if channel is valid */
     if (chan >= timer_config[tim].channels) {
         return -1;
     }
 
-    dev(tim)->INTENCLR = (TIMER_INTENSET_COMPARE0_Msk << chan);
+    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_INTENCLR_INDEX, (TIMER_INTENSET_COMPARE0_Msk << chan));
     /* Clear out the Compare->Clear flag of this channel */
-    dev(tim)->SHORTS &= ~(1 << chan);
+    Pip_in(dev(tim) + PIP_NRF_TIMER_TIMER1_SHORTS_INDEX, &reg);
+    reg &= ~(1 << chan);
+    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_SHORTS_INDEX, reg);
     ctx[tim].flags &= ~(1 << chan);
     ctx[tim].is_periodic &= ~(1 << chan);
 
@@ -148,29 +157,35 @@ int timer_clear(tim_t tim, int chan)
 
 unsigned int timer_read(tim_t tim)
 {
-    dev(tim)->TASKS_CAPTURE[timer_config[tim].channels] = 1;
-    return dev(tim)->CC[timer_config[tim].channels];
+    uint32_t reg;
+
+    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_TASKS_CAPTURE_0_INDEX + timer_config[tim].channels, 1);
+    Pip_in(dev(tim) + PIP_NRF_TIMER_TIMER1_CC_0_INDEX + timer_config[tim].channels, &reg);
+    return (int)reg;
 }
 
 void timer_start(tim_t tim)
 {
-    dev(tim)->TASKS_START = 1;
+    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_TASKS_START_INDEX, 1);
 }
 
 void timer_stop(tim_t tim)
 {
-    dev(tim)->TASKS_STOP = 1;
+    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_TASKS_STOP_INDEX, 1);
 }
 
 static inline void irq_handler(int num)
 {
+    uint32_t reg;
+
     for (unsigned i = 0; i < timer_config[num].channels; i++) {
-        if (dev(num)->EVENTS_COMPARE[i] == 1) {
-            dev(num)->EVENTS_COMPARE[i] = 0;
+        Pip_in(dev(num) + PIP_NRF_TIMER_TIMER1_EVENTS_COMPARE_0_INDEX + i, &reg);
+        if (reg == 1) {
+            Pip_out(dev(num) + PIP_NRF_TIMER_TIMER1_EVENTS_COMPARE_0_INDEX + i, 0);
             if (ctx[num].flags & (1 << i)) {
                 if ((ctx[num].is_periodic & (1 << i)) == 0) {
                     ctx[num].flags &= ~(1 << i);
-                    dev(num)->INTENCLR = (TIMER_INTENSET_COMPARE0_Msk << i);
+                    Pip_out(dev(num) + PIP_NRF_TIMER_TIMER1_INTENCLR_INDEX, (TIMER_INTENSET_COMPARE0_Msk << i));
                 }
                 ctx[num].cb(ctx[num].arg, i);
             }

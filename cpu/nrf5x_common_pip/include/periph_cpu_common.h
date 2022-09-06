@@ -132,7 +132,7 @@ typedef enum {
  * @brief   Timer configuration options
  */
 typedef struct {
-    NRF_TIMER_Type *dev;    /**< timer device */
+    uint32_t dev;           /**< timer device */
     uint8_t channels;       /**< number of channels available */
     uint8_t bitmode;        /**< counter width */
     uint8_t irqn;           /**< IRQ number of the timer device */

@@ -21,6 +21,7 @@
 #define CFG_TIMER_DEFAULT_H
 
 #include "periph_cpu.h"
+#include "register.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,13 +33,13 @@ extern "C" {
  */
 static const timer_conf_t timer_config[] = {
     {
-        .dev      = NRF_TIMER1,
+        .dev      = PIP_NRF_TIMER_TIMER1_BASE,
         .channels = 3,
         .bitmode  = TIMER_BITMODE_BITMODE_32Bit,
         .irqn     = TIMER1_IRQn
     },
     {
-        .dev      = NRF_TIMER2,
+        .dev      = PIP_NRF_TIMER_TIMER2_BASE,
         .channels = 3,
         .bitmode  = TIMER_BITMODE_BITMODE_08Bit,
         .irqn     = TIMER2_IRQn
@@ -47,7 +48,7 @@ static const timer_conf_t timer_config[] = {
      * or NRF52833, but not small ones like NRF52810 */
 #ifdef NRF_TIMER3
     {
-        .dev      = NRF_TIMER3,
+        .dev      = PIP_NRF_TIMER_TIMER3_BASE,
         .channels = 3,
         .bitmode  = TIMER_BITMODE_BITMODE_08Bit,
         .irqn     = TIMER3_IRQn
@@ -55,7 +56,7 @@ static const timer_conf_t timer_config[] = {
 #endif
 #ifdef NRF_TIMER4
     {
-        .dev      = NRF_TIMER4,
+        .dev      = PIP_NRF_TIMER_TIMER4_BASE,
         .channels = 3,
         .bitmode  = TIMER_BITMODE_BITMODE_08Bit,
         .irqn     = TIMER4_IRQn
