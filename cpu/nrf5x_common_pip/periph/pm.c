@@ -22,6 +22,7 @@
  */
 
 #include "cpu.h"
+#include "svc.h"
 
 void pm_off(void)
 {
@@ -29,10 +30,10 @@ void pm_off(void)
     NRF_POWER->RAMON = 0;
 #else
     for (int i = 0; i < 8; i++) {
-        NRF_POWER->RAM[i].POWERCLR = (POWER_RAM_POWERCLR_S1RETENTION_Msk |
-                                      POWER_RAM_POWERCLR_S0RETENTION_Msk);
+        Pip_out(PIP_NRF_POWER_POWER_RAM_0_POWERCLR + i, (POWER_RAM_POWERCLR_S1RETENTION_Msk |
+                                      POWER_RAM_POWERCLR_S0RETENTION_Msk));
     }
 #endif
-    NRF_POWER->SYSTEMOFF = 1;
-    while(1) {}
+    Pip_out(PIP_NRF_POWER_POWER_SYSTEMOFF, 1);
+    while (1) {}
 }
