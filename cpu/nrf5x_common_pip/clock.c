@@ -22,6 +22,7 @@
 #include "assert.h"
 #include "nrf_clock.h"
 #include "periph_conf.h"
+#include "svc.h"
 
 /* make sure both clocks are configured */
 #ifndef CLOCK_HFCLK
@@ -53,11 +54,16 @@ void clock_init_hf(void)
 void clock_hfxo_request(void)
 {
     unsigned state = irq_disable();
+    uint32_t reg;
+
     ++_hfxo_requests;
     if (_hfxo_requests == 1) {
-        NRF_CLOCK->EVENTS_HFCLKSTARTED = 0;
-        NRF_CLOCK->TASKS_HFCLKSTART = 1;
-        while (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0) {}
+        Pip_out(PIP_NRF_CLOCK_CLOCK_EVENTS_HFCLKSTARTED, 0);
+        Pip_out(PIP_NRF_CLOCK_CLOCK_TASKS_HFCLKSTART, 1);
+        Pip_in(PIP_NRF_CLOCK_CLOCK_EVENTS_HFCLKSTARTED, &reg);
+        while (reg == 0) {
+            Pip_in(PIP_NRF_CLOCK_CLOCK_EVENTS_HFCLKSTARTED, &reg);
+	}
     }
     irq_restore(state);
 }
@@ -71,42 +77,58 @@ void clock_hfxo_release(void)
     unsigned state = irq_disable();
     --_hfxo_requests;
     if (_hfxo_requests == 0) {
-        NRF_CLOCK->TASKS_HFCLKSTOP = 1;
+        Pip_out(PIP_NRF_CLOCK_CLOCK_TASKS_HFCLKSTOP, 1);
     }
     irq_restore(state);
 }
 
 void clock_start_lf(void)
 {
+    uint32_t reg;
+
     /* abort if LF clock is already running */
-    if (NRF_CLOCK->LFCLKSTAT & CLOCK_LFCLKSTAT_STATE_Msk) {
+    Pip_in(PIP_NRF_CLOCK_CLOCK_LFCLKSTAT, &reg);
+    if (reg & CLOCK_LFCLKSTAT_STATE_Msk) {
         return;
     }
 
 #if (CLOCK_LFCLK == 0)
-    NRF_CLOCK->LFCLKSRC = (CLOCK_LFCLKSRC_SRC_RC);
+    Pip_out(PIP_NRF_CLOCK_CLOCK_LFCLKSRC, CLOCK_LFCLKSRC_SRC_RC);
 #elif (CLOCK_LFCLK == 1)
-    NRF_CLOCK->LFCLKSRC = (CLOCK_LFCLKSRC_SRC_Xtal);
+    Pip_out(PIP_NRF_CLOCK_CLOCK_LFCLKSRC, CLOCK_LFCLKSRC_SRC_Xtal);
 #elif (CLOCK_LFCLK == 2)
-    NRF_CLOCK->LFCLKSRC = (CLOCK_LFCLKSRC_SRC_Synth);
+    Pip_out(PIP_NRF_CLOCK_CLOCK_LFCLKSRC, CLOCK_LFCLKSRC_SRC_Synth);
+#elif (CLOCK_LFCLK == 3)
+    Pip_out(PIP_NRF_CLOCK_CLOCK_LFCLKSRC, CLOCK_LFCLKSRC_SRC_LFXO);
 #else
 #error "LFCLK init: CLOCK_LFCLK has invalid value"
 #endif
     /* enable LF clock */
-    NRF_CLOCK->EVENTS_LFCLKSTARTED = 0;
-    NRF_CLOCK->TASKS_LFCLKSTART = 1;
-    while (NRF_CLOCK->EVENTS_LFCLKSTARTED == 0) {}
+    Pip_out(PIP_NRF_CLOCK_CLOCK_EVENTS_LFCLKSTARTED, 0);
+    Pip_out(PIP_NRF_CLOCK_CLOCK_TASKS_LFCLKSTART, 1);
+    Pip_in(PIP_NRF_CLOCK_CLOCK_EVENTS_LFCLKSTARTED, &reg);
+    while (reg == 0) {
+        Pip_in(PIP_NRF_CLOCK_CLOCK_EVENTS_LFCLKSTARTED, &reg);
+    }
 
     /* calibrate the RC LF clock if applicable */
 #if (CLOCK_HFCLK && (CLOCK_LFCLK == 0))
-    NRF_CLOCK->EVENTS_DONE = 0;
-    NRF_CLOCK->TASKS_CAL = 1;
-    while (NRF_CLOCK->EVENTS_DONE == 0) {}
+    Pip_out(PIP_NRF_CLOCK_CLOCK_EVENTS_DONE, 0);
+    Pip_out(PIP_NRF_CLOCK_CLOCK_TASKS_CAL, 1);
+    Pip_in(PIP_NRF_CLOCK_CLOCK_EVENTS_DONE, &reg);
+    while (reg == 0) {
+        Pip_in(PIP_NRF_CLOCK_CLOCK_EVENTS_DONE, &reg);
+    }
 #endif
 }
 
 void clock_stop_lf(void)
 {
-    NRF_CLOCK->TASKS_LFCLKSTOP = 1;
-    while (NRF_CLOCK->LFCLKSTAT & CLOCK_LFCLKSTAT_STATE_Msk) {}
+    uint32_t reg;
+
+    Pip_out(PIP_NRF_CLOCK_CLOCK_TASKS_LFCLKSTOP, 1);
+    Pip_in(PIP_NRF_CLOCK_CLOCK_LFCLKSTAT, &reg);
+    while (reg & CLOCK_LFCLKSTAT_STATE_Msk) {
+        Pip_in(PIP_NRF_CLOCK_CLOCK_LFCLKSTAT, &reg);
+    }
 }
