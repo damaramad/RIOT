@@ -35,6 +35,7 @@
 #include "cpu.h"
 #include "periph/uart.h"
 #include "periph/gpio.h"
+#include "svc.h"
 
 #if !defined(CPU_MODEL_NRF52832XXAA) && !defined(CPU_FAM_NRF51)
 #define UART_INVALID    (uart >= UART_NUMOF)
@@ -84,10 +85,10 @@ static inline NRF_UARTE_Type *dev(uart_t uart)
 #else /* nrf51 and nrf52832 etc */
 
 #define UART_INVALID    (uart != 0)
-#define REG_BAUDRATE    NRF_UART0->BAUDRATE
-#define REG_CONFIG      NRF_UART0->CONFIG
-#define PSEL_RXD        NRF_UART0->PSELRXD
-#define PSEL_TXD        NRF_UART0->PSELTXD
+#define REG_BAUDRATE    PIP_NRF_UART_UART0_BAUDRATE
+#define REG_CONFIG      PIP_NRF_UART_UART0_CONFIG
+#define PSEL_RXD        PIP_NRF_UART_UART0_PSELRXD
+#define PSEL_TXD        PIP_NRF_UART_UART0_PSELTXD
 #define UART_0_ISR      isr_uart0
 #define ISR_CTX         isr_ctx
 
@@ -114,17 +115,17 @@ int uart_init(uart_t uart, uint32_t baudrate, uart_rx_cb_t rx_cb, void *arg)
 #endif
 
     /* reset configuration registers */
-    REG_CONFIG = 0;
+    Pip_out(REG_CONFIG, 0);
 
     /* configure RX pin */
     if (rx_cb) {
         gpio_init(UART_PIN_RX, GPIO_IN);
-        PSEL_RXD = UART_PIN_RX;
+        Pip_out(PSEL_RXD, UART_PIN_RX);
     }
 
     /* configure TX pin */
     gpio_init(UART_PIN_TX, GPIO_OUT);
-    PSEL_TXD = UART_PIN_TX;
+    Pip_out(PSEL_TXD, UART_PIN_TX);
 
 #if !defined(CPU_MODEL_NRF52832XXAA) && !defined(CPU_FAM_NRF51)
     /* enable HW-flow control if defined */
@@ -154,60 +155,60 @@ int uart_init(uart_t uart, uint32_t baudrate, uart_rx_cb_t rx_cb, void *arg)
         REG_CONFIG |= UART_CONFIG_HWFC_Msk;     /* enable HW flow control */
     }
 #else
-        NRF_UART0->PSELRTS = 0xffffffff;        /* pin disconnected */
-        NRF_UART0->PSELCTS = 0xffffffff;        /* pin disconnected */
+        Pip_out(PIP_NRF_UART_UART0_PSELRTS, 0xffffffff); /* pin disconnected */
+        Pip_out(PIP_NRF_UART_UART0_PSELCTS, 0xffffffff); /* pin disconnected */
 #endif /* MODULE_PERIPH_UART_HW_FC */
 #endif
 
     /* select baudrate */
     switch (baudrate) {
         case 1200:
-            REG_BAUDRATE = UART_BAUDRATE_BAUDRATE_Baud1200;
+            Pip_out(REG_BAUDRATE, UART_BAUDRATE_BAUDRATE_Baud1200);
             break;
         case 2400:
-            REG_BAUDRATE = UART_BAUDRATE_BAUDRATE_Baud2400;
+            Pip_out(REG_BAUDRATE, UART_BAUDRATE_BAUDRATE_Baud2400);
             break;
         case 4800:
-            REG_BAUDRATE = UART_BAUDRATE_BAUDRATE_Baud4800;
+            Pip_out(REG_BAUDRATE, UART_BAUDRATE_BAUDRATE_Baud4800);
             break;
         case 9600:
-            REG_BAUDRATE = UART_BAUDRATE_BAUDRATE_Baud9600;
+            Pip_out(REG_BAUDRATE, UART_BAUDRATE_BAUDRATE_Baud9600);
             break;
         case 14400:
-            REG_BAUDRATE = UART_BAUDRATE_BAUDRATE_Baud14400;
+            Pip_out(REG_BAUDRATE, UART_BAUDRATE_BAUDRATE_Baud14400);
             break;
         case 19200:
-            REG_BAUDRATE = UART_BAUDRATE_BAUDRATE_Baud19200;
+            Pip_out(REG_BAUDRATE, UART_BAUDRATE_BAUDRATE_Baud19200);
             break;
         case 28800:
-            REG_BAUDRATE = UART_BAUDRATE_BAUDRATE_Baud28800;
+            Pip_out(REG_BAUDRATE, UART_BAUDRATE_BAUDRATE_Baud28800);
             break;
         case 38400:
-            REG_BAUDRATE = UART_BAUDRATE_BAUDRATE_Baud38400;
+            Pip_out(REG_BAUDRATE, UART_BAUDRATE_BAUDRATE_Baud38400);
             break;
         case 57600:
-            REG_BAUDRATE = UART_BAUDRATE_BAUDRATE_Baud57600;
+            Pip_out(REG_BAUDRATE, UART_BAUDRATE_BAUDRATE_Baud57600);
             break;
         case 76800:
-            REG_BAUDRATE = UART_BAUDRATE_BAUDRATE_Baud76800;
+            Pip_out(REG_BAUDRATE, UART_BAUDRATE_BAUDRATE_Baud76800);
             break;
         case 115200:
-            REG_BAUDRATE = UART_BAUDRATE_BAUDRATE_Baud115200;
+            Pip_out(REG_BAUDRATE, UART_BAUDRATE_BAUDRATE_Baud115200);
             break;
         case 230400:
-            REG_BAUDRATE = UART_BAUDRATE_BAUDRATE_Baud230400;
+            Pip_out(REG_BAUDRATE, UART_BAUDRATE_BAUDRATE_Baud230400);
             break;
         case 250000:
-            REG_BAUDRATE = UART_BAUDRATE_BAUDRATE_Baud250000;
+            Pip_out(REG_BAUDRATE, UART_BAUDRATE_BAUDRATE_Baud250000);
             break;
         case 460800:
-            REG_BAUDRATE = UART_BAUDRATE_BAUDRATE_Baud460800;
+            Pip_out(REG_BAUDRATE, UART_BAUDRATE_BAUDRATE_Baud460800);
             break;
         case 921600:
-            REG_BAUDRATE = UART_BAUDRATE_BAUDRATE_Baud921600;
+            Pip_out(REG_BAUDRATE, UART_BAUDRATE_BAUDRATE_Baud921600);
             break;
         case 1000000:
-            REG_BAUDRATE = UART_BAUDRATE_BAUDRATE_Baud1M;
+            Pip_out(REG_BAUDRATE, UART_BAUDRATE_BAUDRATE_Baud1M);
             break;
         default:
             return UART_NOBAUD;
@@ -217,8 +218,8 @@ int uart_init(uart_t uart, uint32_t baudrate, uart_rx_cb_t rx_cb, void *arg)
 #if !defined(CPU_MODEL_NRF52832XXAA) && !defined(CPU_FAM_NRF51)
     dev(uart)->ENABLE = UARTE_ENABLE_ENABLE_Enabled;
 #else
-    NRF_UART0->ENABLE = UART_ENABLE_ENABLE_Enabled;
-    NRF_UART0->TASKS_STARTTX = 1;
+    Pip_out(PIP_NRF_UART_UART0_ENABLE, UART_ENABLE_ENABLE_Enabled);
+    Pip_out(PIP_NRF_UART_UART0_TASKS_STARTTX, 1);
 #endif
 
 #ifdef MODULE_PERIPH_UART_NONBLOCKING
@@ -234,8 +235,8 @@ int uart_init(uart_t uart, uint32_t baudrate, uart_rx_cb_t rx_cb, void *arg)
         dev(uart)->SHORTS |= UARTE_SHORTS_ENDRX_STARTRX_Msk;
         dev(uart)->TASKS_STARTRX = 1;
 #else
-        NRF_UART0->INTENSET = UART_INTENSET_RXDRDY_Msk;
-        NRF_UART0->TASKS_STARTRX = 1;
+        Pip_out(PIP_NRF_UART_UART0_INTENSET, UART_INTENSET_RXDRDY_Msk);
+        Pip_out(PIP_NRF_UART_UART0_TASKS_STARTRX, 1);
 #endif
     }
 
