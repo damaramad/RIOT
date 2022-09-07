@@ -44,14 +44,14 @@ extern "C" {
  */
 static const spi_conf_t spi_config[] = {
     {
-        .dev  = NRF_SPIM0,
+        .dev  = PIP_NRF_SPIM_SPIM0_BASE,
         .sclk = GPIO_PIN(0, 4),
         .mosi = GPIO_PIN(0, 5),
         .miso = GPIO_PIN(0, 6),
         .ppi = 0,
     },
     {   /* Connected to the DWM1001 UWB transceiver */
-        .dev  = NRF_SPIM1,
+        .dev  = PIP_NRF_SPIM_SPIM1_BASE,
         .sclk = GPIO_PIN(0, 16),
         .mosi = GPIO_PIN(0, 20),
         .miso = GPIO_PIN(0, 18),
@@ -68,7 +68,7 @@ static const spi_conf_t spi_config[] = {
  */
 static const i2c_conf_t i2c_config[] = {
     {
-        .dev = NRF_TWIM1,
+        .dev = PIP_NRF_TWIM_TWIM1_BASE,
         .scl = GPIO_PIN(0, 28),
         .sda = GPIO_PIN(0, 29),
         .speed = I2C_SPEED_NORMAL

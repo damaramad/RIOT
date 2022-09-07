@@ -25,6 +25,7 @@
 
 #include "cpu.h"
 #include "periph_cpu.h"
+#include "svc.h"
 
 #if NRF_SPIM0_BASE != NRF_TWIM0_BASE
 #define ISR_SPIM0   isr_spi0
@@ -60,23 +61,25 @@ static spi_twi_irq_cb_t _irq[SPIM_COUNT];
 static void *_irq_arg[SPIM_COUNT];
 
 /* I2C and SPI share peripheral addresses */
-static size_t _spi_dev2num(void *dev)
+static size_t _spi_dev2num(uint32_t dev)
 {
-    if (dev == NRF_SPIM0) {
+    if (dev == PIP_NRF_SPIM_SPIM0_BASE ||
+        dev == PIP_NRF_TWIM_TWIM0_BASE) {
         return 0;
     }
 #ifdef NRF_SPIM1
-    else if (dev == NRF_SPIM1) {
+    else if (dev == PIP_NRF_SPIM_SPIM1_BASE ||
+             dev == PIP_NRF_TWIM_TWIM1_BASE) {
         return 1;
     }
 #endif
 #ifdef NRF_SPIM2
-    else if (dev == NRF_SPIM2) {
+    else if (dev == PIP_NRF_SPIM_SPIM2_BASE) {
         return 2;
     }
 #endif /* NRF_SPIM2 */
 #ifdef NRF_SPIM3
-    else if (dev == NRF_SPIM3) {
+    else if (dev == PIP_NRF_SPIM_SPIM3_BASE) {
         return 3;
     }
 #endif /* NRF_SPIM3 */
@@ -86,7 +89,7 @@ static size_t _spi_dev2num(void *dev)
     }
 }
 
-static inline size_t _i2c_dev2num(void *dev)
+static inline size_t _i2c_dev2num(uint32_t dev)
 {
     if (NRF_SPIM0_BASE == NRF_TWIM0_BASE) {
         return _spi_dev2num(dev);
@@ -120,7 +123,7 @@ static const IRQn_Type _isr[] = {
 #endif /* CPU_MODEL_NRF52840XXAA */
 };
 
-void spi_twi_irq_register_spi(NRF_SPIM_Type *bus,
+void spi_twi_irq_register_spi(uint32_t bus,
                               spi_twi_irq_cb_t cb, void *arg)
 {
     size_t num = _spi_dev2num(bus);
@@ -130,7 +133,7 @@ void spi_twi_irq_register_spi(NRF_SPIM_Type *bus,
     NVIC_EnableIRQ(_isr[num]);
 }
 
-void spi_twi_irq_register_i2c(NRF_TWIM_Type *bus,
+void spi_twi_irq_register_i2c(uint32_t bus,
                               spi_twi_irq_cb_t cb, void *arg)
 {
     size_t num = _i2c_dev2num(bus);

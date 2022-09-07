@@ -129,7 +129,7 @@ typedef enum {
  * @brief   I2C (TWI) configuration options
  */
 typedef struct {
-    NRF_TWIM_Type *dev;         /**< TWIM hardware device */
+    uint32_t dev;               /**< TWIM hardware device */
     gpio_t scl;                 /**< SCL pin */
     gpio_t sda;                 /**< SDA pin */
     i2c_speed_t speed;          /**< Bus speed */
@@ -228,7 +228,7 @@ typedef struct {
  * @brief  SPI configuration values
  */
 typedef struct {
-    NRF_SPIM_Type *dev; /**< SPI device used */
+    uint32_t dev;       /**< SPI device used */
     gpio_t sclk;        /**< CLK pin */
     gpio_t mosi;        /**< MOSI pin */
     gpio_t miso;        /**< MISO pin */
@@ -252,7 +252,7 @@ typedef void (*spi_twi_irq_cb_t)(void *arg);
  * @param   cb  callback to call on IRQ
  * @param   arg Argument to pass to the handler
  */
-void spi_twi_irq_register_spi(NRF_SPIM_Type *bus,
+void spi_twi_irq_register_spi(uint32_t bus,
                               spi_twi_irq_cb_t cb, void *arg);
 
 /**
@@ -262,7 +262,7 @@ void spi_twi_irq_register_spi(NRF_SPIM_Type *bus,
  * @param   cb  callback to call on IRQ
  * @param   arg Argument to pass to the handler
  */
-void spi_twi_irq_register_i2c(NRF_TWIM_Type *bus,
+void spi_twi_irq_register_i2c(uint32_t bus,
                               spi_twi_irq_cb_t cb, void *arg);
 #ifdef __cplusplus
 }

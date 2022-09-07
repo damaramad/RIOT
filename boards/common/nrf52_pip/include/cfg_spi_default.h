@@ -32,7 +32,7 @@ extern "C" {
  */
 static const spi_conf_t spi_config[] = {
     {
-        .dev  = NRF_SPIM0,
+        .dev  = PIP_NRF_SPIM_SPIM0_BASE,
         .sclk = GPIO_PIN(0, 15),
         .mosi = GPIO_PIN(0, 13),
         .miso = GPIO_PIN(0, 14),

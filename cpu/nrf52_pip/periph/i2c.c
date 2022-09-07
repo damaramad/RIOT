@@ -32,6 +32,8 @@
 #include "periph/i2c.h"
 #include "periph/gpio.h"
 
+#include "svc.h"
+
 #define ENABLE_DEBUG        0
 #include "debug.h"
 
@@ -53,32 +55,38 @@ static mutex_t busy[I2C_NUMOF];
 
 void i2c_isr_handler(void *arg);
 
-static inline NRF_TWIM_Type *bus(i2c_t dev)
+static inline uint32_t bus(i2c_t dev)
 {
     return i2c_config[dev].dev;
 }
 
 static int finish(i2c_t dev)
 {
+    uint32_t reg;
+
     DEBUG("[i2c] waiting for STOPPED or ERROR event\n");
     /* Unmask interrupts */
-    bus(dev)->INTENSET = TWIM_INTEN_STOPPED_Msk | TWIM_INTEN_ERROR_Msk;
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_INTENSET_INDEX, TWIM_INTEN_STOPPED_Msk | TWIM_INTEN_ERROR_Msk);
     mutex_lock(&busy[dev]);
 
-    if ((bus(dev)->EVENTS_STOPPED)) {
-        bus(dev)->EVENTS_STOPPED = 0;
+    Pip_in(bus(dev) + PIP_NRF_TWIM_TWIM1_EVENTS_STOPPED_INDEX, &reg);
+    if (reg) {
+        Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_EVENTS_STOPPED_INDEX, 0);
         DEBUG("[i2c] finish: stop event occurred\n");
     }
 
-    if (bus(dev)->EVENTS_ERROR) {
-        bus(dev)->EVENTS_ERROR = 0;
-        if (bus(dev)->ERRORSRC & TWIM_ERRORSRC_ANACK_Msk) {
-            bus(dev)->ERRORSRC = TWIM_ERRORSRC_ANACK_Msk;
+    Pip_in(bus(dev) + PIP_NRF_TWIM_TWIM1_EVENTS_ERROR_INDEX, &reg);
+    if (reg) {
+        Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_EVENTS_ERROR_INDEX, 0);
+        Pip_in(bus(dev) + PIP_NRF_TWIM_TWIM1_ERRORSRC_INDEX, &reg);
+        if (reg & TWIM_ERRORSRC_ANACK_Msk) {
+            Pip_out(bus(dev) + bus(dev) + PIP_NRF_TWIM_TWIM1_ERRORSRC_INDEX, TWIM_ERRORSRC_ANACK_Msk);
             DEBUG("[i2c] check_error: NACK on address byte\n");
             return -ENXIO;
         }
-        if (bus(dev)->ERRORSRC & TWIM_ERRORSRC_DNACK_Msk) {
-            bus(dev)->ERRORSRC = TWIM_ERRORSRC_DNACK_Msk;
+        Pip_in(bus(dev) + PIP_NRF_TWIM_TWIM1_ERRORSRC_INDEX, &reg);
+        if (reg & TWIM_ERRORSRC_DNACK_Msk) {
+            Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_ERRORSRC_INDEX, TWIM_ERRORSRC_DNACK_Msk);
             DEBUG("[i2c] check_error: NACK on data byte\n");
             return -EIO;
         }
@@ -91,8 +99,8 @@ static void _init_pins(i2c_t dev)
 {
     gpio_init(i2c_config[dev].scl, GPIO_IN_OD_PU);
     gpio_init(i2c_config[dev].sda, GPIO_IN_OD_PU);
-    bus(dev)->PSEL.SCL = i2c_config[dev].scl;
-    bus(dev)->PSEL.SDA = i2c_config[dev].sda;
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_PSEL_SCL_INDEX, i2c_config[dev].scl);
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_PSEL_SDA_INDEX, i2c_config[dev].sda);
 }
 
 void i2c_init(i2c_t dev)
@@ -106,20 +114,20 @@ void i2c_init(i2c_t dev)
 
     /* disable device during initialization, will be enabled when acquire is
      * called */
-    bus(dev)->ENABLE = TWIM_ENABLE_ENABLE_Disabled;
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_ENABLE_INDEX, TWIM_ENABLE_ENABLE_Disabled);
 
     /* configure pins */
     _init_pins(dev);
 
     /* configure dev clock speed */
-    bus(dev)->FREQUENCY = i2c_config[dev].speed;
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_FREQUENCY_INDEX, i2c_config[dev].speed);
 
     spi_twi_irq_register_i2c(bus(dev), i2c_isr_handler, (void *)dev);
 
     /* We expect that the device was being acquired before
      * the i2c_init_master() function is called, so it should be enabled when
      * exiting this function. */
-    bus(dev)->ENABLE = TWIM_ENABLE_ENABLE_Enabled;
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_ENABLE_INDEX, TWIM_ENABLE_ENABLE_Enabled);
 }
 
 #ifdef MODULE_PERIPH_I2C_RECONFIGURE
@@ -129,7 +137,7 @@ void i2c_init_pins(i2c_t dev)
 
     _init_pins(dev);
 
-    bus(dev)->ENABLE = TWIM_ENABLE_ENABLE_Enabled;
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_ENABLE_INDEX, TWIM_ENABLE_ENABLE_Enabled);
 
     mutex_unlock(&locks[dev]);
 }
@@ -139,7 +147,7 @@ void i2c_deinit_pins(i2c_t dev)
     assert(dev < I2C_NUMOF);
 
     mutex_lock(&locks[dev]);
-    bus(dev)->ENABLE = TWIM_ENABLE_ENABLE_Disabled;
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_ENABLE_INDEX, TWIM_ENABLE_ENABLE_Disabled);
 }
 #endif /* MODULE_PERIPH_I2C_RECONFIGURE */
 
@@ -148,7 +156,7 @@ int i2c_acquire(i2c_t dev)
     assert(dev < I2C_NUMOF);
 
     mutex_lock(&locks[dev]);
-    bus(dev)->ENABLE = TWIM_ENABLE_ENABLE_Enabled;
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_ENABLE_INDEX, TWIM_ENABLE_ENABLE_Enabled);
 
     DEBUG("[i2c] acquired dev %i\n", (int)dev);
     return 0;
@@ -158,7 +166,7 @@ void i2c_release(i2c_t dev)
 {
     assert(dev < I2C_NUMOF);
 
-    bus(dev)->ENABLE = TWIM_ENABLE_ENABLE_Disabled;
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_ENABLE_INDEX, TWIM_ENABLE_ENABLE_Disabled);
     mutex_unlock(&locks[dev]);
 
     DEBUG("[i2c] released dev %i\n", (int)dev);
@@ -194,15 +202,15 @@ int i2c_read_bytes(i2c_t dev, uint16_t addr, void *data, size_t len,
     }
     DEBUG("[i2c] read_bytes: %i bytes from addr 0x%02x\n", (int)len, (int)addr);
 
-    bus(dev)->ADDRESS = addr;
-    bus(dev)->RXD.PTR = (uint32_t)data;
-    bus(dev)->RXD.MAXCNT = (uint8_t)len;
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_ADDRESS_INDEX, addr);
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_RXD_PTR_INDEX, (uint32_t)data);
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_RXD_MAXCNT_INDEX, (uint8_t)len);
 
     if (!(flags & I2C_NOSTOP)) {
-        bus(dev)->SHORTS = TWIM_SHORTS_LASTRX_STOP_Msk;
+        Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_SHORTS_INDEX, TWIM_SHORTS_LASTRX_STOP_Msk);
     }
     /* Start transmission */
-    bus(dev)->TASKS_STARTRX = 1;
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_TASKS_STARTRX_INDEX, 1);
 
     return finish(dev);
 }
@@ -210,6 +218,8 @@ int i2c_read_bytes(i2c_t dev, uint16_t addr, void *data, size_t len,
 int i2c_read_regs(i2c_t dev, uint16_t addr, uint16_t reg,
                   void *data, size_t len, uint8_t flags)
 {
+    uint32_t reg2;
+
     assert((dev < I2C_NUMOF) && data && (len > 0) && (len < 256));
 
     if (flags & (I2C_NOSTART | I2C_REG16 | I2C_ADDR10)) {
@@ -218,16 +228,18 @@ int i2c_read_regs(i2c_t dev, uint16_t addr, uint16_t reg,
     DEBUG("[i2c] read_regs: %i byte(s) from reg 0x%02x at addr 0x%02x\n",
            (int)len, (int)reg, (int)addr);
 
-    bus(dev)->ADDRESS = addr;
-    bus(dev)->TXD.PTR = (uint32_t)&reg;
-    bus(dev)->TXD.MAXCNT = 1;
-    bus(dev)->RXD.PTR = (uint32_t)data;
-    bus(dev)->RXD.MAXCNT = (uint8_t)len;
-    bus(dev)->SHORTS = (TWIM_SHORTS_LASTTX_STARTRX_Msk);
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_ADDRESS_INDEX, addr);
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_TXD_PTR_INDEX, (uint32_t)&reg);
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_TXD_MAXCNT_INDEX, 1);
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_RXD_PTR_INDEX, (uint32_t)data);
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_RXD_MAXCNT_INDEX, (uint8_t)len);
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_SHORTS_INDEX, TWIM_SHORTS_LASTTX_STARTRX_Msk);
     if (!(flags & I2C_NOSTOP)) {
-        bus(dev)->SHORTS |=  TWIM_SHORTS_LASTRX_STOP_Msk;
+        Pip_in(bus(dev) + PIP_NRF_TWIM_TWIM1_SHORTS_INDEX, &reg2);
+        reg2 |=  TWIM_SHORTS_LASTRX_STOP_Msk;
+        Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_SHORTS_INDEX, reg2);
     }
-    bus(dev)->TASKS_STARTTX = 1;
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_TASKS_STARTTX_INDEX, 1);
 
     return finish(dev);
 }
@@ -242,13 +254,13 @@ int i2c_write_bytes(i2c_t dev, uint16_t addr, const void *data, size_t len,
     }
     DEBUG("[i2c] write_bytes: %i byte(s) to addr 0x%02x\n", (int)len, (int)addr);
 
-    bus(dev)->ADDRESS = addr;
-    bus(dev)->TXD.PTR = (uint32_t)data;
-    bus(dev)->TXD.MAXCNT = (uint8_t)len;
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_ADDRESS_INDEX, addr);
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_TXD_PTR_INDEX, (uint32_t)data);
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_TXD_MAXCNT_INDEX, (uint8_t)len);
     if (!(flags & I2C_NOSTOP)) {
-        bus(dev)->SHORTS = TWIM_SHORTS_LASTTX_STOP_Msk;
+        Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_SHORTS_INDEX, TWIM_SHORTS_LASTTX_STOP_Msk);
     }
-    bus(dev)->TASKS_STARTTX = 1;
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_TASKS_STARTTX_INDEX, 1);
 
     return finish(dev);
 }
@@ -258,7 +270,7 @@ void i2c_isr_handler(void *arg)
     i2c_t dev = (i2c_t)arg;
 
     /* Mask interrupts to ensure that they only trigger once */
-    bus(dev)->INTENCLR = TWIM_INTEN_STOPPED_Msk | TWIM_INTEN_ERROR_Msk;
+    Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_INTENCLR_INDEX, TWIM_INTEN_STOPPED_Msk | TWIM_INTEN_ERROR_Msk);
 
     mutex_unlock(&busy[dev]);
 }
