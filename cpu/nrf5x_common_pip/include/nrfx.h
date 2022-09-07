@@ -25,6 +25,8 @@
 #include "cpu_conf.h"
 #include "periph_conf.h"
 
+#include "svc.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -44,7 +46,7 @@ extern "C" {
 static inline void nrfx_dcdc_init(void)
 {
     if (IS_ACTIVE(MODULE_VDD_LC_FILTER_REG1)) {
-        NRF_POWER->DCDCEN = 1;
+        Pip_out(PIP_NRF_POWER_POWER_DCDCEN, 1);
     }
 
 #ifdef POWER_DCDCEN0_DCDCEN_Msk
