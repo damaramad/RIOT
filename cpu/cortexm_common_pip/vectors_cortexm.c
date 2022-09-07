@@ -55,26 +55,10 @@
  * @brief   Memory markers, defined in the linker script
  * @{
  */
-extern uint32_t _sfixed;
-extern uint32_t _efixed;
-extern uint32_t _etext;
-extern uint32_t _srelocate;
-extern uint32_t _erelocate;
-extern uint32_t _szero;
-extern uint32_t _ezero;
 extern uint32_t _sstack;
 extern uint32_t _estack;
 extern uint8_t _sram;
 extern uint8_t _eram;
-
-/* Support for LPRAM. */
-#ifdef CPU_HAS_BACKUP_RAM
-extern const uint32_t _sbackup_data_load[];
-extern uint32_t _sbackup_data[];
-extern uint32_t _ebackup_data[];
-extern uint32_t _sbackup_bss[];
-extern uint32_t _ebackup_bss[];
-#endif /* CPU_HAS_BACKUP_RAM */
 /** @} */
 
 /**
@@ -112,11 +96,6 @@ void start(interface_t *interface)
 void reset_handler_default(void)
 {
     uint32_t *dst;
-    const uint32_t *src = &_etext;
-
-#ifdef MODULE_PUF_SRAM
-    puf_sram_init((uint8_t *)&_srelocate, SEED_RAM_LEN);
-#endif
 
     pre_startup();
 
@@ -130,34 +109,6 @@ void reset_handler_default(void)
         *(dst++) = STACK_CANARY_WORD;
     }
 #endif
-
-    /* load data section from flash to ram */
-    for (dst = &_srelocate; dst < &_erelocate; ) {
-        *(dst++) = *(src++);
-    }
-
-    /* default bss section to zero */
-    for (dst = &_szero; dst < &_ezero; ) {
-        *(dst++) = 0;
-    }
-
-#ifdef CPU_HAS_BACKUP_RAM
-    if (!cpu_woke_from_backup() ||
-        CPU_BACKUP_RAM_NOT_RETAINED) {
-
-        /* load low-power data section. */
-        for (dst = _sbackup_data, src = _sbackup_data_load;
-             dst < _ebackup_data;
-             dst++, src++) {
-            *dst = *src;
-        }
-
-        /* zero-out low-power bss. */
-        for (dst = _sbackup_bss; dst < _ebackup_bss; dst++) {
-            *dst = 0;
-        }
-    }
-#endif /* CPU_HAS_BACKUP_RAM */
 
 #ifdef MODULE_MPU_NOEXEC_RAM
     /* Mark the RAM non executable. This is a protection mechanism which
