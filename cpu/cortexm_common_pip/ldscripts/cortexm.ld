@@ -38,7 +38,6 @@ ENTRY(start)
 PADDING = 8;
 
 /* XXX */
-_sstack = 0;
 _estack = 0;
 _eram = 0;
 _sram = 0;

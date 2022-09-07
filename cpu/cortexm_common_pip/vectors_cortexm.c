@@ -55,7 +55,7 @@
  * @brief   Memory markers, defined in the linker script
  * @{
  */
-extern uint32_t _sstack;
+uint32_t *_sstack;
 extern uint32_t _estack;
 extern uint8_t _sram;
 extern uint8_t _eram;
@@ -89,6 +89,10 @@ void start(interface_t *interface)
     extern void heap_init(void *start, void *end);
     heap_init(interface->unusedRamStart, interface->ramEnd);
 
+    /* Initialization of global variables with
+     * values only known at runtime. */
+    _sstack = (uint32_t *) interface->stackLimit;
+
     /* Call RIOT entry point */
     reset_handler_default();
 }
@@ -104,7 +108,7 @@ void reset_handler_default(void)
     /* Fill stack space with canary values up until the current stack pointer */
     /* Read current stack pointer from CPU register */
     __asm__ volatile ("mov %[top], sp" : [top] "=r" (top) : : );
-    dst = &_sstack;
+    dst = _sstack;
     while (dst < top) {
         *(dst++) = STACK_CANARY_WORD;
     }
@@ -125,10 +129,10 @@ void reset_handler_default(void)
 #endif
 
 #ifdef MODULE_MPU_STACK_GUARD
-    if (((uintptr_t)&_sstack) != SRAM_BASE) {
+    if (((uintptr_t)_sstack) != SRAM_BASE) {
         mpu_configure(
             1,                                              /* MPU region 1 */
-            (uintptr_t)&_sstack + 31,                       /* Base Address (rounded up) */
+            (uintptr_t)_sstack + 31,                        /* Base Address (rounded up) */
             MPU_ATTR(1, AP_RO_RO, 0, 1, 0, 1, MPU_SIZE_32B) /* Attributes and Size */
         );
 
@@ -179,7 +183,7 @@ static inline int _stack_size_left(uint32_t required)
 {
     uint32_t* sp;
     __asm__ volatile ("mov %[sp], sp" : [sp] "=r" (sp) : : );
-    return ((int)((uint32_t)sp - (uint32_t)&_sstack) - required);
+    return ((int)((uint32_t)sp - (uint32_t)_sstack) - required);
 }
 
 void hard_fault_handler(uint32_t* sp, uint32_t corrupted, uint32_t exc_return, uint32_t* r4_to_r11_stack);
@@ -288,7 +292,7 @@ __attribute__((used)) void hard_fault_handler(uint32_t* sp, uint32_t corrupted, 
 
     /* Check if the ISR stack overflowed previously. Not possible to detect
      * after output may also have overflowed it. */
-    if(*(&_sstack) != STACK_CANARY_WORD) {
+    if(*_sstack != STACK_CANARY_WORD) {
         puts("\nISR stack overflowed");
     }
     /* Sanity check stack pointer and give additional feedback about hard fault */
