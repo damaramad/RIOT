@@ -22,6 +22,8 @@
  * limitations under the License.
  */
 
+#include "svc.h"
+
 #if   defined ( __ICCARM__ )
   #pragma system_include         /* treat file as system include file for MISRA check */
 #elif defined (__clang__)
@@ -1689,7 +1691,7 @@ __STATIC_INLINE void __NVIC_EnableIRQ(IRQn_Type IRQn)
 {
   if ((int32_t)(IRQn) >= 0)
   {
-    NVIC->ISER[(((uint32_t)IRQn) >> 5UL)] = (uint32_t)(1UL << (((uint32_t)IRQn) & 0x1FUL));
+    Pip_out(PIP_ARMV7M_SCS_NVIC_ISER0 + (((uint32_t)IRQn) >> 5UL), (uint32_t)(1UL << (((uint32_t)IRQn) & 0x1FUL)));
   }
 }
 
@@ -1725,7 +1727,7 @@ __STATIC_INLINE void __NVIC_DisableIRQ(IRQn_Type IRQn)
 {
   if ((int32_t)(IRQn) >= 0)
   {
-    NVIC->ICER[(((uint32_t)IRQn) >> 5UL)] = (uint32_t)(1UL << (((uint32_t)IRQn) & 0x1FUL));
+    Pip_out(PIP_ARMV7M_SCS_NVIC_ICER0 + (((uint32_t)IRQn) >> 5UL), (uint32_t)(1UL << (((uint32_t)IRQn) & 0x1FUL)));
     __DSB();
     __ISB();
   }
@@ -1778,7 +1780,7 @@ __STATIC_INLINE void __NVIC_ClearPendingIRQ(IRQn_Type IRQn)
 {
   if ((int32_t)(IRQn) >= 0)
   {
-    NVIC->ICPR[(((uint32_t)IRQn) >> 5UL)] = (uint32_t)(1UL << (((uint32_t)IRQn) & 0x1FUL));
+    Pip_out(PIP_ARMV7M_SCS_NVIC_ICPR0 + (((uint32_t)IRQn) >> 5UL), (uint32_t)(1UL << (((uint32_t)IRQn) & 0x1FUL)));
   }
 }
 
@@ -1817,11 +1819,11 @@ __STATIC_INLINE void __NVIC_SetPriority(IRQn_Type IRQn, uint32_t priority)
 {
   if ((int32_t)(IRQn) >= 0)
   {
-    NVIC->IP[((uint32_t)IRQn)]               = (uint8_t)((priority << (8U - __NVIC_PRIO_BITS)) & (uint32_t)0xFFUL);
+    Pip_out(PIP_ARMV7M_SCS_NVIC_IPR0 + ((uint32_t)IRQn), (uint8_t)((priority << (8U - __NVIC_PRIO_BITS)) & (uint32_t)0xFFUL));
   }
   else
   {
-    SCB->SHP[(((uint32_t)IRQn) & 0xFUL)-4UL] = (uint8_t)((priority << (8U - __NVIC_PRIO_BITS)) & (uint32_t)0xFFUL);
+    Pip_out(PIP_ARMV7M_SCS_SCID_SHPR1 + (((uint32_t)IRQn) & 0xFUL)-4UL, (uint8_t)((priority << (8U - __NVIC_PRIO_BITS)) & (uint32_t)0xFFUL));
   }
 }
 
