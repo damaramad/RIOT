@@ -78,7 +78,6 @@ CORTEXM_STATIC_INLINE void cortexm_init_misc(void)
 
 void cortexm_init(void)
 {
-    cortexm_init_fpu();
     cortexm_init_isr_priorities();
     cortexm_init_misc();
 }
