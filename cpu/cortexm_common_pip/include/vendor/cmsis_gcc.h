@@ -25,6 +25,8 @@
 #ifndef __CMSIS_GCC_H
 #define __CMSIS_GCC_H
 
+#include "svc.h"
+
 /* ignore some GCC warnings */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsign-conversion"
@@ -128,7 +130,7 @@
  */
 __STATIC_FORCEINLINE void __enable_irq(void)
 {
-  __ASM volatile ("cpsie i" : : : "memory");
+  Pip_setIntState(1);
 }
 
 
@@ -139,7 +141,7 @@ __STATIC_FORCEINLINE void __enable_irq(void)
  */
 __STATIC_FORCEINLINE void __disable_irq(void)
 {
-  __ASM volatile ("cpsid i" : : : "memory");
+  Pip_setIntState(0);
 }
 
 

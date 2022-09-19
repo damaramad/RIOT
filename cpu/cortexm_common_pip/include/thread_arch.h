@@ -25,18 +25,18 @@
 extern "C" {
 #endif
 
+extern void *riotPartDesc;
+
 #define THREAD_API_INLINED
 
 #ifndef DOXYGEN /* Doxygen is in core/include/thread.h */
 
 static inline __attribute__((always_inline)) void thread_yield_higher(void)
 {
-    /* trigger the PENDSV interrupt to run scheduler and schedule new thread if
-     * applicable */
-    SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
-    /* flush the pipeline. Otherwise we risk that subsequent instructions are
-     * executed before the IRQ has actually triggered */
-    __ISB();
+    /* Trigger the PENDSV interrupt to run scheduler and schedule new thread if
+     * applicable. Do not save current context by passing the index 0 of the VIDT
+     * containing a NULL pointer to the yield function. */
+    Pip_yield(riotPartDesc, 14, 0, 0, 0);
 }
 
 #endif /* DOXYGEN */

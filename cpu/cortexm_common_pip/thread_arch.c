@@ -99,10 +99,14 @@
 #include "thread.h"
 #include "irq.h"
 #include "cpu.h"
+#include "context.h"
 
 #define ENABLE_DEBUG 0
 #include "debug.h"
 
+extern void *riotPartDesc;
+extern vidt_t *riotVidt;
+extern void *riotGotAddr;
 extern uint32_t _estack;
 extern uint32_t _sstack;
 
@@ -115,8 +119,6 @@ extern uint32_t _sstack;
 #else
 #define CPU_CORE_CORTEXM_FULL_THUMB 1
 #endif
-
-
 
 /**
  * @brief   Noticeable marker marking the beginning of a stack segment
@@ -144,96 +146,45 @@ char *thread_stack_init(thread_task_func_t task_func,
                              void *stack_start,
                              int stack_size)
 {
-    uint32_t *stk;
-    stk = (uint32_t *)((uintptr_t)stack_start + stack_size);
+    basicContext_t *ctx;
+    uint32_t *sp;
 
-    /* adjust to 32 bit boundary by clearing the last two bits in the address */
-    stk = (uint32_t *)(((uint32_t)stk) & ~((uint32_t)0x3));
+    /* reserve a room on the stack for the context of
+     * the thread */
+    stack_size -= sizeof(basicContext_t);
+    stack_size &= ~(0x3);
+    if (stack_size < 0) {
+        DEBUG("thread_stack_init: stack size is too small!\n");
+        /* XXX: What should we do? */
+        for (;;);
+    }
+    ctx = (basicContext_t *)(uintptr_t)(stack_start + stack_size);
 
-    /* stack start marker */
-    stk--;
-    *stk = STACK_MARKER;
-
-    /* make sure the stack is double word aligned (8 bytes) */
-    /* This is required in order to conform with Procedure Call Standard for the
-     * ARM® Architecture (AAPCS) */
-    /* http://infocenter.arm.com/help/topic/com.arm.doc.ihi0042e/IHI0042E_aapcs.pdf */
-    if (((uint32_t) stk & 0x7) != 0) {
+    /* prepare the stack of the thread */
+    sp = (uint32_t *) ctx;
+    sp--;
+    *sp = STACK_MARKER;
+    sp--;
+    if (((uint32_t) sp & 0x7) != 0) {
         /* add a single word padding */
-        --stk;
-        *stk = ~((uint32_t)STACK_MARKER);
+        --sp;
+        *sp = ~((uint32_t)STACK_MARKER);
     }
 
-    /* ****************************** */
-    /* Automatically popped registers */
-    /* ****************************** */
-
-    /* The following eight stacked registers are popped by the hardware upon
-     * return from exception. (bx instruction in select_and_restore_context) */
-
-    /* xPSR - initial status register */
-    stk--;
-    *stk = (uint32_t)INITIAL_XPSR;
-    /* pc - initial program counter value := thread entry function */
-    stk--;
-    *stk = (uint32_t)task_func;
-    /* lr - contains the return address when the thread exits */
-    stk--;
-    *stk = (uint32_t)sched_task_exit;
-    /* r12 */
-    stk--;
-    *stk = 0;
-    /* r3 - r1 */
-    for (int i = 3; i >= 1; i--) {
-        stk--;
-        *stk = i;
+    /* initialize each register of the thread */
+    for (size_t i = 0; i < BASIC_FRAME_SIZE; i++) {
+        ctx->frame.registers[i] = 0;
     }
-    /* r0 - contains the thread function parameter */
-    stk--;
-    *stk = (uint32_t)arg;
 
-    /* ************************* */
-    /* Manually popped registers */
-    /* ************************* */
+    /* prepare the context pf the thread */
+    ctx->isBasicFrame = 1;
+    ctx->pipflags = 0;
+    ctx->frame.r0 = (uint32_t) arg;
+    ctx->frame.r10 = (uint32_t) riotGotAddr;
+    ctx->frame.pc = (uint32_t) task_func;
+    ctx->frame.sp = (uint32_t) sp;
 
-    /* The following registers are not handled by hardware in return from
-     * exception, but manually by select_and_restore_context.
-     * For the Cortex-M0, Cortex-M0+ and Cortex-M23 we write registers R11-R4
-     * in two groups to allow for more efficient context save/restore code.
-     * For the Cortex-M3, Cortex-M33 and Cortex-M4 we write them continuously
-     * onto the stack as they can be read/written continuously by stack
-     * instructions. */
-
-    /* exception return code  - return to task-mode process stack pointer */
-    stk--;
-    *stk = (uint32_t)EXCEPT_RET_TASK_MODE;
-#if !CPU_CORE_CORTEXM_FULL_THUMB
-    /* start with r7 - r4 */
-    for (int i = 7; i >= 4; i--) {
-        stk--;
-        *stk = i;
-    }
-    /* and put r11 - r8 on top of them */
-    for (int i = 11; i >= 8; i--) {
-        stk--;
-        *stk = i;
-    }
-#else
-    /* r11 - r4 */
-    for (int i = 11; i >= 4; i--) {
-        stk--;
-        *stk = i;
-    }
-#endif
-
-
-    /* The returned stack pointer will be aligned on a 32 bit boundary not on a
-     * 64 bit boundary because of the odd number of registers above (8+9).
-     * This is not a problem since the initial stack pointer upon process entry
-     * _will_ be 64 bit aligned (because of the cleared bit 9 in the stacked
-     * xPSR and aligned stacking of the hardware-handled registers). */
-
-    return (char*) stk;
+    return (char*) sp;
 }
 
 void thread_stack_print(void)
@@ -292,65 +243,34 @@ void NORETURN cpu_switch_context_exit(void)
 }
 
 #if CPU_CORE_CORTEXM_FULL_THUMB
-void __attribute__((naked)) __attribute__((used)) isr_pendsv(void) {
-    __asm__ volatile (
-    /* PendSV handler entry point */
-    /* save context by pushing unsaved registers to the stack */
-    /* {r0-r3,r12,LR,PC,xPSR,s0-s15,FPSCR} are saved automatically on exception entry */
-    ".thumb_func                      \n"
-    ".syntax unified                  \n"
+void __attribute__((used)) isr_pendsv(void) {
+    thread_t *thread;
+    uintptr_t addr;
 
-    /* skip context saving if sched_active_thread == NULL */
-    "ldr    r1, =sched_active_thread  \n" /* r1 = &sched_active_thread  */
-    "push   {r4, lr}                  \n" /* push r4 and exception return code */
-    "ldr    r4, [r1]                  \n" /* r4 = sched_active_thread   */
+    /* election of the thread to execute */
+    thread = sched_run();
 
-    "cpsid  i                         \n" /* Disable IRQs during sched_run */
-    "bl     sched_run                 \n" /* perform scheduling */
-    "cpsie  i                         \n" /* Re-enable interrupts */
-
-    "cmp    r0, r4                    \n" /* if r0 == r1: (new thread == old
-                                               thread, no switch required) */
-    "it     eq                        \n"
-    "popeq  {r4, pc}                  \n" /* Pop exception to pc to return */
-
-    "mov    r1, r4                    \n" /* save sched_active_thread in r1 */
-    "pop    {r4, lr}                  \n" /* Pop exception from the exception stack */
-
-    "cbz    r1, restore_context       \n" /* goto restore_context if r1 == 0 */
-
-    "mrs    r2, psp                   \n" /* get stack pointer from user mode */
-
-#ifdef MODULE_CORTEXM_FPU
-    "tst    lr, #0x10                 \n"
-    "it     eq                        \n"
-    "vstmdbeq r2!, {s16-s31}          \n" /* save FPU registers if FPU is used */
+    /* retrieve the address of the context stored on the
+     * stack of the elected thread */
+#if PICOLIBC_TLS
+    addr = (uintptr_t) thread->tls;
+#else
+    addr = (uintptr_t) thread;
 #endif
-    "stmdb  r2!,{r4-r11,lr}           \n" /* save regs, including lr */
-    "str    r2, [r1]                  \n" /* write r0 to thread->sp */
+    addr -= sizeof(basicContext_t);
+    addr &= ~(0x3);
 
-    /* current thread context is now saved */
-    "restore_context:                 \n" /* Label to skip thread state saving */
+    /* update the stack pointer of the thread_t structure
+     * for consistency */
+    thread->sp = (char *)((basicContext_t *) addr)->frame.sp;
 
-    "ldr    r0, [r0]                  \n" /* load tcb->sp to register 1 */
-    "ldmia  r0!, {r4-r11,lr}          \n" /* restore other registers, including lr */
-#ifdef MODULE_CORTEXM_FPU
-    "tst    lr, #0x10                 \n"
-    "it     eq                        \n"
-    "vldmiaeq r0!, {s16-s31}          \n" /* load FPU registers if saved */
-#endif
-    "msr    psp, r0                   \n" /* restore user mode SP to PSP reg */
-    "bx     lr                        \n" /* load exception return value to PC,
-                                           * causes end of exception*/
+    /* update the index 0 of the VIDT of RIOT with the
+     * address of the context of the elected thread */
+    riotVidt->contexts[0] = (void *) addr;
 
-    /* return from exception mode to application mode */
-    /* {r0-r3,r12,LR,PC,xPSR,s0-s15,FPSCR} are restored automatically on exception return */
-     ".ltorg                           \n" /* literal pool needed to access
-                                            * sched_active_thread */
-     :
-     :
-     :
-    );
+    /* yield to the elected thread without saving the
+     * current context */
+    Pip_yield(riotPartDesc, 0, 46, 0, 0);
 }
 #else /* CPU_CORE_CORTEXM_FULL_THUMB */
 void __attribute__((naked)) __attribute__((used)) isr_pendsv(void) {

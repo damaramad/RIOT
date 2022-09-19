@@ -23,6 +23,11 @@
 #include "cpu.h"
 #include "vectors_cortexm.h"
 
+#include "adt.h"
+#include "context.h"
+
+extern vidt_t *riotVidt;
+
 /* define a local dummy handler as it needs to be in the same compilation unit
  * as the alias definition */
 void dummy_handler(void) {
@@ -71,9 +76,10 @@ WEAK_DEFAULT void isr_rtc2(void);
 WEAK_DEFAULT void isr_i2s(void);
 WEAK_DEFAULT void isr_fpu(void);
 
-/* CPU specific interrupt vector table */
-ISR_VECTOR(1)
-const isr_t vector_cpu[CPU_IRQ_NUMOF] = {
+/**
+ * @brief   Handlers for each nRF52832 interrupt.
+ */
+static isr_t nrf52_pip_handlers[CPU_IRQ_NUMOF] = {
     isr_power_clock,       /* power_clock */
     isr_radio,             /* radio */
     isr_uart0,             /* uart0 */
@@ -104,8 +110,8 @@ const isr_t vector_cpu[CPU_IRQ_NUMOF] = {
     isr_timer4,            /* timer 4 */
     isr_pwm0,              /* pwm 0 */
     isr_pdm,               /* pdm */
-    (0UL),                 /* reserved */
-    (0UL),                 /* reserved */
+    NULL,                  /* reserved */
+    NULL,                  /* reserved */
     isr_mwu,               /* mwu */
     isr_pwm1,              /* pwm 1 */
     isr_pwm2,              /* pwm 2 */
@@ -114,3 +120,76 @@ const isr_t vector_cpu[CPU_IRQ_NUMOF] = {
     isr_i2s,               /* i2s */
     isr_fpu,               /* fpu */
 };
+
+/**
+ * @brief   Interrupt dispatcher for each nRF52832 interrupt.
+ */
+void __attribute__((noreturn)) nrf52_pip_dispatcher(void)
+{
+    nrf52_pip_handlers[riotVidt->currentInterrupt - 16]();
+    for (;;);
+}
+
+/**
+ * @brief   Context for each nRF52832 interrupt.
+ */
+static basicContext_t nrf52_pip_ctx = {
+    .isBasicFrame = 1,
+    .pipflags = 0,
+    .frame = {
+        /* The SP will be initialized in the
+	 * start() function because its value will
+	 * only be known at runtime. */
+        .sp = 0,
+        .r4 = 0,
+        .r5 = 0,
+        .r6 = 0,
+        .r7 = 0,
+        .r8 = 0,
+        .r9 = 0,
+        /* The R10 will be initialized in the
+	 * start() function because its value will
+	 * only be known at runtime. */
+        .r10 = 0,
+        .r11 = 0,
+        .r0 = 0,
+        .r1 = 0,
+        .r2 = 0,
+        .r3 = 0,
+        .r12 = 0,
+        .lr = 0,
+        .pc = (uint32_t) nrf52_pip_dispatcher,
+        .xpsr = 0
+    }
+};
+
+/**
+ * @brief   Initialize the context for each nRF52832 interrupt
+ *          with values only known at runtime.
+ *
+ * @param sp The address of the stack pointer.
+ *
+ * @param sl The address of the GOT.
+ */
+void nrf52_pip_ctx_init(void *sp, void *sl)
+{
+    nrf52_pip_ctx.frame.sp = (uint32_t) sp;
+    nrf52_pip_ctx.frame.r10 = (uint32_t) sl;
+}
+
+/**
+ * @brief   Initialize the entries of the VIDT corresponding to
+ *          the interrupts of the nRF52832 with the address of
+ *          the handler's context.
+ *
+ * @param vidt The address of the VIDT of RIOT.
+ */
+void nrf52_pip_vidt_init(vidt_t *vidt)
+{
+    for (size_t i = 0; i < CPU_IRQ_NUMOF; i++) {
+        vidt->contexts[i + 16] = &nrf52_pip_ctx;
+    }
+    /* reserved */
+    vidt->contexts[46] = NULL;
+    vidt->contexts[47] = NULL;
+}

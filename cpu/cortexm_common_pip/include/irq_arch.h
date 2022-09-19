@@ -18,12 +18,12 @@
  * @}
  */
 
-
 #ifndef IRQ_ARCH_H
 #define IRQ_ARCH_H
 
 #include <stdint.h>
 #include "cpu_conf.h"
+#include "svc.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,7 +34,7 @@ extern "C" {
  */
 static inline __attribute__((always_inline)) unsigned int irq_disable(void)
 {
-    uint32_t mask = __get_PRIMASK();
+    uint32_t mask = Pip_getSelfIntState();
 
     __disable_irq();
     return mask;
@@ -46,7 +46,7 @@ static inline __attribute__((always_inline)) unsigned int irq_disable(void)
 static inline __attribute__((always_inline)) __attribute__((used)) unsigned int
 irq_enable(void)
 {
-    unsigned result = __get_PRIMASK();
+    unsigned result = Pip_getSelfIntState();
 
     __enable_irq();
     return result;
@@ -58,7 +58,7 @@ irq_enable(void)
 static inline __attribute__((always_inline)) void irq_restore(
     unsigned int state)
 {
-    __set_PRIMASK(state);
+    Pip_setIntState(state);
 }
 
 /**
