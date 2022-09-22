@@ -25,8 +25,10 @@
 
 #include "adt.h"
 #include "context.h"
+#include "svc.h"
 
 extern vidt_t *riotVidt;
+extern void *riotPartDesc;
 
 /* define a local dummy handler as it needs to be in the same compilation unit
  * as the alias definition */
@@ -127,6 +129,7 @@ static isr_t nrf52_pip_handlers[CPU_IRQ_NUMOF] = {
 void __attribute__((noreturn)) nrf52_pip_dispatcher(void)
 {
     nrf52_pip_handlers[riotVidt->currentInterrupt - 16]();
+    Pip_yield(riotPartDesc, 0, 46, 0, 0);
     for (;;);
 }
 
