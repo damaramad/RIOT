@@ -405,6 +405,7 @@ static inline void irq_handler(uart_t uart)
 
 void uart_write(uart_t uart, const uint8_t *data, size_t len)
 {
+    uint32_t reg;
     (void)uart;
 
     for (size_t i = 0; i < len; i++) {
@@ -418,11 +419,14 @@ void uart_write(uart_t uart, const uint8_t *data, size_t len)
            while loop.
         */
         /* reset ready flag */
-        NRF_UART0->EVENTS_TXDRDY = 0;
+        Pip_out(PIP_NRF_UART_UART0_EVENTS_TXDRDY, 0);
         /* write data into transmit register */
-        NRF_UART0->TXD = data[i];
+        Pip_out(PIP_NRF_UART_UART0_TXD, data[i]);
         /* wait for any transmission to be done */
-        while (NRF_UART0->EVENTS_TXDRDY == 0) {}
+        Pip_in(PIP_NRF_UART_UART0_EVENTS_TXDRDY, &reg);
+        while (reg == 0) {
+            Pip_in(PIP_NRF_UART_UART0_EVENTS_TXDRDY, &reg);
+	}
     }
 }
 
@@ -430,9 +434,9 @@ void uart_poweron(uart_t uart)
 {
     (void)uart;
 
-    NRF_UART0->TASKS_STARTTX = 1;
+    Pip_out(PIP_NRF_UART_UART0_TASKS_STARTTX, 1);
     if (isr_ctx.rx_cb) {
-        NRF_UART0->TASKS_STARTRX = 1;
+        Pip_out(PIP_NRF_UART_UART0_TASKS_STARTRX, 1);
     }
 }
 
@@ -440,12 +444,13 @@ void uart_poweroff(uart_t uart)
 {
     (void)uart;
 
-    NRF_UART0->TASKS_SUSPEND;
+    Pip_out(PIP_NRF_UART_UART0_TASKS_SUSPEND, 1);
 }
 
 int uart_mode(uart_t uart, uart_data_bits_t data_bits, uart_parity_t parity,
               uart_stop_bits_t stop_bits)
 {
+    uint32_t reg;
     (void)uart;
 
     if (stop_bits != UART_STOP_BITS_1) {
@@ -461,10 +466,14 @@ int uart_mode(uart_t uart, uart_data_bits_t data_bits, uart_parity_t parity,
     }
 
     if (parity == UART_PARITY_EVEN) {
-        NRF_UART0->CONFIG |= UART_CONFIG_PARITY_Msk;
+        Pip_in(PIP_NRF_UART_UART0_CONFIG, &reg);
+        reg |= UART_CONFIG_PARITY_Msk;
+        Pip_out(PIP_NRF_UART_UART0_CONFIG, reg);
     }
     else {
-        NRF_UART0->CONFIG &= ~UART_CONFIG_PARITY_Msk;
+        Pip_in(PIP_NRF_UART_UART0_CONFIG, &reg);
+        reg &= ~UART_CONFIG_PARITY_Msk;
+        Pip_out(PIP_NRF_UART_UART0_CONFIG, reg);
     }
 
     return UART_OK;
@@ -472,11 +481,14 @@ int uart_mode(uart_t uart, uart_data_bits_t data_bits, uart_parity_t parity,
 
 static inline void irq_handler(uart_t uart)
 {
+    uint32_t reg;
     (void)uart;
 
-    if (NRF_UART0->EVENTS_RXDRDY == 1) {
-        NRF_UART0->EVENTS_RXDRDY = 0;
-        uint8_t byte = (uint8_t)(NRF_UART0->RXD & 0xff);
+    Pip_in(PIP_NRF_UART_UART0_EVENTS_RXDRDY, &reg);
+    if (reg == 1) {
+        Pip_out(PIP_NRF_UART_UART0_EVENTS_RXDRDY, 0);
+        Pip_in(PIP_NRF_UART_UART0_RXD, &reg);
+        uint8_t byte = (uint8_t)(reg & 0xff);
         isr_ctx.rx_cb(isr_ctx.arg, byte);
     }
 
