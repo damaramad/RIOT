@@ -1,6 +1,6 @@
 PKG_NAME    = libpip
 PKG_URL     = https://github.com/damaramad/libpip.git
-PKG_VERSION = e6cfa147caf77a7a45cd2de10f41656884719396
+PKG_VERSION = 5f5a06a5684c58bf8fbe7dc0c30f8d441401f626
 PKG_LICENSE = CeCILL-2.1
 
 include $(RIOTBASE)/pkg/pkg.mk
