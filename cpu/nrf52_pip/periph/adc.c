@@ -73,8 +73,6 @@ static inline void done(void)
 
 int adc_init(adc_t line)
 {
-    uint32_t reg;
-
     if (line >= ADC_NUMOF) {
         return -1;
     }
@@ -82,8 +80,7 @@ int adc_init(adc_t line)
     prep();
 
     /* prevent multiple initialization by checking the result ptr register */
-    Pip_in(PIP_NRF_SAADC_SAADC_RESULT_PTR, &reg);
-    if (reg != (uint32_t)&result) {
+    if (Pip_in(PIP_NRF_SAADC_SAADC_RESULT_PTR) != (uint32_t)&result) {
         /* set data pointer and the single channel we want to convert */
         Pip_out(PIP_NRF_SAADC_SAADC_RESULT_MAXCNT, 1);
         Pip_out(PIP_NRF_SAADC_SAADC_RESULT_PTR, (uint32_t)&result);
@@ -103,10 +100,7 @@ int adc_init(adc_t line)
         Pip_out(PIP_NRF_SAADC_SAADC_EVENTS_CALIBRATEDONE, 0);
         Pip_out(PIP_NRF_SAADC_SAADC_TASKS_CALIBRATEOFFSET, 1);
 
-        Pip_in(PIP_NRF_SAADC_SAADC_EVENTS_CALIBRATEDONE, &reg);
-        while (reg == 0) {
-            Pip_in(PIP_NRF_SAADC_SAADC_EVENTS_CALIBRATEDONE, &reg);
-	}
+        while (Pip_in(PIP_NRF_SAADC_SAADC_EVENTS_CALIBRATEDONE) == 0) {}
     }
 
     done();
@@ -116,8 +110,6 @@ int adc_init(adc_t line)
 
 int32_t adc_sample(adc_t line, adc_res_t res)
 {
-    uint32_t reg;
-
     assert(line < ADC_NUMOF);
 
     /* check if resolution is valid */
@@ -146,29 +138,17 @@ int32_t adc_sample(adc_t line, adc_res_t res)
     /* start the SAADC and wait for the started event */
     Pip_out(PIP_NRF_SAADC_SAADC_EVENTS_STARTED, 0);
     Pip_out(PIP_NRF_SAADC_SAADC_TASKS_START, 1);
-
-    Pip_in(PIP_NRF_SAADC_SAADC_EVENTS_STARTED, &reg);
-    while (reg == 0) {
-        Pip_in(PIP_NRF_SAADC_SAADC_EVENTS_STARTED, &reg);
-    }
+    while (Pip_in(PIP_NRF_SAADC_SAADC_EVENTS_STARTED) == 0) {}
 
     /* trigger the actual conversion */
     Pip_out(PIP_NRF_SAADC_SAADC_EVENTS_END, 0);
     Pip_out(PIP_NRF_SAADC_SAADC_TASKS_SAMPLE, 1);
-
-    Pip_in(PIP_NRF_SAADC_SAADC_EVENTS_END, &reg);
-    while (reg == 0) {
-        Pip_in(PIP_NRF_SAADC_SAADC_EVENTS_END, &reg);
-    }
+    while (Pip_in(PIP_NRF_SAADC_SAADC_EVENTS_END) == 0) {}
 
     /* stop the SAADC */
     Pip_out(PIP_NRF_SAADC_SAADC_EVENTS_STOPPED, 0);
     Pip_out(PIP_NRF_SAADC_SAADC_TASKS_STOP, 1);
-
-    Pip_in(PIP_NRF_SAADC_SAADC_EVENTS_STOPPED, &reg);
-    while (reg == 0) {
-        Pip_in(PIP_NRF_SAADC_SAADC_EVENTS_STOPPED, &reg);
-    }
+    while (Pip_in(PIP_NRF_SAADC_SAADC_EVENTS_STOPPED) == 0) {}
 
     /* free device */
     done();

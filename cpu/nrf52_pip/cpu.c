@@ -41,14 +41,11 @@ static bool ftpan_36(void);
  */
 void cpu_init(void)
 {
-    uint32_t reg;
-
     /* Workaround for FTPAN-32
      * "DIF: Debug session automatically enables TracePort pins." */
     if (ftpan_32()) {
-        Pip_in(PIP_ARMV7M_SCS_SCID_DEMCR, &reg);
-        reg &= ~CoreDebug_DEMCR_TRCENA_Msk;
-        Pip_out(PIP_ARMV7M_SCS_SCID_DEMCR, reg);
+        Pip_out(PIP_ARMV7M_SCS_SCID_DEMCR,
+            Pip_in(PIP_ARMV7M_SCS_SCID_DEMCR) & ~CoreDebug_DEMCR_TRCENA_Msk);
     }
 
     /* Workaround for FTPAN-37
@@ -78,9 +75,8 @@ void cpu_init(void)
     cortexm_init();
 
     /* enable wake up on events for __WFE CPU sleep */
-    Pip_in(PIP_ARMV7M_SCS_SCID_SCR, &reg);
-    reg |= SCB_SCR_SEVONPEND_Msk;
-    Pip_out(PIP_ARMV7M_SCS_SCID_SCR, reg);
+    Pip_out(PIP_ARMV7M_SCS_SCID_SCR,
+        Pip_in(PIP_ARMV7M_SCS_SCID_SCR) | SCB_SCR_SEVONPEND_Msk);
 
     /* initialize stdio prior to periph_init() to allow use of DEBUG() there */
     stdio_init();
@@ -94,15 +90,10 @@ void cpu_init(void)
  */
 static bool ftpan_32(void)
 {
-    uint32_t reg;
-    Pip_in(PIP_NRF_ERRATA_REG0, &reg);
-    if ((reg & 0x000000FF) == 0x6) {
-      Pip_in(PIP_NRF_ERRATA_REG1, &reg);
-      if ((reg & 0x0000000F) == 0x0) {
-        Pip_in(PIP_NRF_ERRATA_REG2, &reg);
-        if ((reg & 0x000000F0) == 0x30) {
-          Pip_in(PIP_NRF_ERRATA_REG3, &reg);
-          if ((reg & 0x000000F0) == 0x0) {
+    if ((Pip_in(PIP_NRF_ERRATA_REG0) & 0x000000FF) == 0x6) {
+      if ((Pip_in(PIP_NRF_ERRATA_REG1) & 0x0000000F) == 0x0) {
+        if ((Pip_in(PIP_NRF_ERRATA_REG2) & 0x000000F0) == 0x30) {
+          if ((Pip_in(PIP_NRF_ERRATA_REG3) & 0x000000F0) == 0x0) {
             return true;
 	  }
         }
@@ -116,15 +107,10 @@ static bool ftpan_32(void)
  */
 static bool ftpan_36(void)
 {
-    uint32_t reg;
-    Pip_in(PIP_NRF_ERRATA_REG0, &reg);
-    if ((reg & 0x000000FF) == 0x6) {
-      Pip_in(PIP_NRF_ERRATA_REG1, &reg);
-      if ((reg & 0x0000000F) == 0x0) {
-        Pip_in(PIP_NRF_ERRATA_REG2, &reg);
-        if ((reg & 0x000000F0) == 0x30) {
-          Pip_in(PIP_NRF_ERRATA_REG3, &reg);
-          if ((reg & 0x000000F0) == 0x0) {
+    if ((Pip_in(PIP_NRF_ERRATA_REG0) & 0x000000FF) == 0x6) {
+      if ((Pip_in(PIP_NRF_ERRATA_REG1) & 0x0000000F) == 0x0) {
+        if ((Pip_in(PIP_NRF_ERRATA_REG2) & 0x000000F0) == 0x30) {
+          if ((Pip_in(PIP_NRF_ERRATA_REG3) & 0x000000F0) == 0x0) {
             return true;
 	  }
         }
@@ -138,15 +124,10 @@ static bool ftpan_36(void)
  */
 static bool ftpan_37(void)
 {
-    uint32_t reg;
-    Pip_in(PIP_NRF_ERRATA_REG0, &reg);
-    if ((reg & 0x000000FF) == 0x6) {
-      Pip_in(PIP_NRF_ERRATA_REG1, &reg);
-      if ((reg & 0x0000000F) == 0x0) {
-        Pip_in(PIP_NRF_ERRATA_REG2, &reg);
-        if ((reg & 0x000000F0) == 0x30) {
-          Pip_in(PIP_NRF_ERRATA_REG3, &reg);
-          if ((reg & 0x000000F0) == 0x0) {
+    if ((Pip_in(PIP_NRF_ERRATA_REG0) & 0x000000FF) == 0x6) {
+      if ((Pip_in(PIP_NRF_ERRATA_REG1) & 0x0000000F) == 0x0) {
+        if ((Pip_in(PIP_NRF_ERRATA_REG2) & 0x000000F0) == 0x30) {
+          if ((Pip_in(PIP_NRF_ERRATA_REG3) & 0x000000F0) == 0x0) {
             return true;
 	  }
         }

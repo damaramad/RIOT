@@ -62,30 +62,24 @@ static inline uint32_t bus(i2c_t dev)
 
 static int finish(i2c_t dev)
 {
-    uint32_t reg;
-
     DEBUG("[i2c] waiting for STOPPED or ERROR event\n");
     /* Unmask interrupts */
     Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_INTENSET_INDEX, TWIM_INTEN_STOPPED_Msk | TWIM_INTEN_ERROR_Msk);
     mutex_lock(&busy[dev]);
 
-    Pip_in(bus(dev) + PIP_NRF_TWIM_TWIM1_EVENTS_STOPPED_INDEX, &reg);
-    if (reg) {
+    if (Pip_in(bus(dev) + PIP_NRF_TWIM_TWIM1_EVENTS_STOPPED_INDEX)) {
         Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_EVENTS_STOPPED_INDEX, 0);
         DEBUG("[i2c] finish: stop event occurred\n");
     }
 
-    Pip_in(bus(dev) + PIP_NRF_TWIM_TWIM1_EVENTS_ERROR_INDEX, &reg);
-    if (reg) {
+    if (Pip_in(bus(dev) + PIP_NRF_TWIM_TWIM1_EVENTS_ERROR_INDEX)) {
         Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_EVENTS_ERROR_INDEX, 0);
-        Pip_in(bus(dev) + PIP_NRF_TWIM_TWIM1_ERRORSRC_INDEX, &reg);
-        if (reg & TWIM_ERRORSRC_ANACK_Msk) {
+        if (Pip_in(bus(dev) + PIP_NRF_TWIM_TWIM1_ERRORSRC_INDEX) & TWIM_ERRORSRC_ANACK_Msk) {
             Pip_out(bus(dev) + bus(dev) + PIP_NRF_TWIM_TWIM1_ERRORSRC_INDEX, TWIM_ERRORSRC_ANACK_Msk);
             DEBUG("[i2c] check_error: NACK on address byte\n");
             return -ENXIO;
         }
-        Pip_in(bus(dev) + PIP_NRF_TWIM_TWIM1_ERRORSRC_INDEX, &reg);
-        if (reg & TWIM_ERRORSRC_DNACK_Msk) {
+        if (Pip_in(bus(dev) + PIP_NRF_TWIM_TWIM1_ERRORSRC_INDEX) & TWIM_ERRORSRC_DNACK_Msk) {
             Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_ERRORSRC_INDEX, TWIM_ERRORSRC_DNACK_Msk);
             DEBUG("[i2c] check_error: NACK on data byte\n");
             return -EIO;
@@ -218,8 +212,6 @@ int i2c_read_bytes(i2c_t dev, uint16_t addr, void *data, size_t len,
 int i2c_read_regs(i2c_t dev, uint16_t addr, uint16_t reg,
                   void *data, size_t len, uint8_t flags)
 {
-    uint32_t reg2;
-
     assert((dev < I2C_NUMOF) && data && (len > 0) && (len < 256));
 
     if (flags & (I2C_NOSTART | I2C_REG16 | I2C_ADDR10)) {
@@ -235,9 +227,8 @@ int i2c_read_regs(i2c_t dev, uint16_t addr, uint16_t reg,
     Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_RXD_MAXCNT_INDEX, (uint8_t)len);
     Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_SHORTS_INDEX, TWIM_SHORTS_LASTTX_STARTRX_Msk);
     if (!(flags & I2C_NOSTOP)) {
-        Pip_in(bus(dev) + PIP_NRF_TWIM_TWIM1_SHORTS_INDEX, &reg2);
-        reg2 |=  TWIM_SHORTS_LASTRX_STOP_Msk;
-        Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_SHORTS_INDEX, reg2);
+        Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_SHORTS_INDEX,
+            Pip_in(bus(dev) + PIP_NRF_TWIM_TWIM1_SHORTS_INDEX) | TWIM_SHORTS_LASTRX_STOP_Msk);
     }
     Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_TASKS_STARTTX_INDEX, 1);
 
