@@ -58,21 +58,17 @@ CORTEXM_STATIC_INLINE void cortexm_init_isr_priorities(void)
 
 CORTEXM_STATIC_INLINE void cortexm_init_misc(void)
 {
-    uint32_t reg;
-
     /* enable wake up on events for __WFE CPU sleep */
-    Pip_in(PIP_ARMV7M_SCS_SCID_SCR, &reg);
-    reg |= SCB_SCR_SEVONPEND_Msk;
-    Pip_out(PIP_ARMV7M_SCS_SCID_SCR, reg);
+    Pip_out(PIP_ARMV7M_SCS_SCID_SCR,
+        Pip_in(PIP_ARMV7M_SCS_SCID_SCR) | SCB_SCR_SEVONPEND_Msk);
 
     /* for Cortex-M3 r1p0 and up the STKALIGN option was added, but not automatically
      * enabled until revision r2p0. For 64bit function arguments to work properly this
      * needs to be enabled.
      */
 #ifdef SCB_CCR_STKALIGN_Msk
-    Pip_in(PIP_ARMV7M_SCS_SCID_CCR, &reg);
-    reg |= SCB_CCR_STKALIGN_Msk;
-    Pip_out(PIP_ARMV7M_SCS_SCID_CCR, reg);
+    Pip_out(PIP_ARMV7M_SCS_SCID_CCR,
+        Pip_in(PIP_ARMV7M_SCS_SCID_CCR) | SCB_CCR_STKALIGN_Msk);
 #endif
 }
 
@@ -87,36 +83,30 @@ bool cpu_check_address(volatile const char *address)
 #if defined(CPU_CORE_CORTEX_M3) || defined(CPU_CORE_CORTEX_M33) || \
     defined(CPU_CORE_CORTEX_M4) || defined(CPU_CORE_CORTEX_M4F) || \
     defined(CPU_CORE_CORTEX_M7)
-    uint32_t reg;
-
     static const uint32_t BFARVALID_MASK = (0x80 << SCB_CFSR_BUSFAULTSR_Pos);
 
     bool is_valid = true;
 
     /* Clear BFARVALID flag */
-    Pip_in(PIP_ARMV7M_SCS_SCID_CFSR, &reg);
-    reg |= BFARVALID_MASK;
-    Pip_out(PIP_ARMV7M_SCS_SCID_CFSR, reg);
+    Pip_out(PIP_ARMV7M_SCS_SCID_CFSR,
+        Pip_in(PIP_ARMV7M_SCS_SCID_CFSR) | BFARVALID_MASK);
 
     /* Ignore BusFault by enabling BFHFNMIGN and disabling interrupts */
     uint32_t mask = __get_FAULTMASK();
     __disable_fault_irq();
-    Pip_in(PIP_ARMV7M_SCS_SCID_CCR, &reg);
-    reg |= SCB_CCR_BFHFNMIGN_Msk;
-    Pip_out(PIP_ARMV7M_SCS_SCID_CCR, reg);
+    Pip_out(PIP_ARMV7M_SCS_SCID_CCR,
+        Pip_in(PIP_ARMV7M_SCS_SCID_CCR) | SCB_CCR_BFHFNMIGN_Msk);
 
     *address;
     /* Check BFARVALID flag */
-    Pip_in(PIP_ARMV7M_SCS_SCID_CFSR, &reg);
-    if ((reg & BFARVALID_MASK) != 0) {
+    if ((Pip_in(PIP_ARMV7M_SCS_SCID_CFSR) & BFARVALID_MASK) != 0) {
         /* Bus Fault occurred reading the address */
         is_valid = false;
     }
 
     /* Re-enable BusFault by clearing  BFHFNMIGN */
-    Pip_in(PIP_ARMV7M_SCS_SCID_CCR, &reg);
-    reg &= ~SCB_CCR_BFHFNMIGN_Msk;
-    Pip_out(PIP_ARMV7M_SCS_SCID_CCR, reg);
+    Pip_out(PIP_ARMV7M_SCS_SCID_CCR,
+        Pip_in(PIP_ARMV7M_SCS_SCID_CCR) & ~SCB_CCR_BFHFNMIGN_Msk);
     __set_FAULTMASK(mask);
 
     return is_valid;
