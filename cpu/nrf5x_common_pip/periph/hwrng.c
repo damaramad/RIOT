@@ -37,7 +37,6 @@ void hwrng_read(void *buf, unsigned int num)
 {
     unsigned int count = 0;
     uint8_t *b = (uint8_t *)buf;
-    uint32_t reg;
 
     /* power on RNG */
 #ifdef CPU_FAM_NRF51
@@ -49,14 +48,11 @@ void hwrng_read(void *buf, unsigned int num)
     /* read the actual random data */
     while (count < num) {
         /* sleep until number is generated */
-        Pip_in(PIP_NRF_RNG_RNG_EVENTS_VALRDY, &reg);
-        while (reg == 0) {
-            Pip_in(PIP_NRF_RNG_RNG_EVENTS_VALRDY, &reg);
+        while (Pip_in(PIP_NRF_RNG_RNG_EVENTS_VALRDY) == 0) {
             cortexm_sleep_until_event();
         }
 
-        Pip_in(PIP_NRF_RNG_RNG_VALUE, &reg);
-        b[count++] = (uint8_t)reg;
+        b[count++] = (uint8_t)Pip_in(PIP_NRF_RNG_RNG_VALUE);
         /* NRF51 PAN #21 -> read value before clearing VALRDY */
         Pip_out(PIP_NRF_RNG_RNG_EVENTS_VALRDY, 0);
         NVIC_ClearPendingIRQ(RNG_IRQn);

@@ -26,8 +26,6 @@
 
 void flashpage_erase(unsigned page)
 {
-    uint32_t reg;
-
     assert(page < (int)FLASHPAGE_NUMOF);
 
     uint32_t *page_addr = (uint32_t *)flashpage_addr(page);
@@ -35,11 +33,7 @@ void flashpage_erase(unsigned page)
     /* erase given page */
     Pip_out(PIP_NRF_NVMC_NVMC_CONFIG, NVMC_CONFIG_WEN_Een);
     Pip_out(PIP_NRF_NVMC_NVMC_ERASEPAGE, (uint32_t)page_addr);
-
-    Pip_in(PIP_NRF_NVMC_NVMC_READY, &reg);
-    while (reg == 0) {
-        Pip_in(PIP_NRF_NVMC_NVMC_READY, &reg);
-    }
+    while (Pip_in(PIP_NRF_NVMC_NVMC_READY) == 0) {}
 }
 
 void flashpage_write(void *target_addr, const void *data, size_t len)

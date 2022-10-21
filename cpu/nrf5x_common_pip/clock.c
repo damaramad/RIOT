@@ -54,16 +54,12 @@ void clock_init_hf(void)
 void clock_hfxo_request(void)
 {
     unsigned state = irq_disable();
-    uint32_t reg;
 
     ++_hfxo_requests;
     if (_hfxo_requests == 1) {
         Pip_out(PIP_NRF_CLOCK_CLOCK_EVENTS_HFCLKSTARTED, 0);
         Pip_out(PIP_NRF_CLOCK_CLOCK_TASKS_HFCLKSTART, 1);
-        Pip_in(PIP_NRF_CLOCK_CLOCK_EVENTS_HFCLKSTARTED, &reg);
-        while (reg == 0) {
-            Pip_in(PIP_NRF_CLOCK_CLOCK_EVENTS_HFCLKSTARTED, &reg);
-	}
+        while (Pip_in(PIP_NRF_CLOCK_CLOCK_EVENTS_HFCLKSTARTED) == 0) {}
     }
     irq_restore(state);
 }
@@ -84,11 +80,8 @@ void clock_hfxo_release(void)
 
 void clock_start_lf(void)
 {
-    uint32_t reg;
-
     /* abort if LF clock is already running */
-    Pip_in(PIP_NRF_CLOCK_CLOCK_LFCLKSTAT, &reg);
-    if (reg & CLOCK_LFCLKSTAT_STATE_Msk) {
+    if (Pip_in(PIP_NRF_CLOCK_CLOCK_LFCLKSTAT) & CLOCK_LFCLKSTAT_STATE_Msk) {
         return;
     }
 
@@ -106,29 +99,18 @@ void clock_start_lf(void)
     /* enable LF clock */
     Pip_out(PIP_NRF_CLOCK_CLOCK_EVENTS_LFCLKSTARTED, 0);
     Pip_out(PIP_NRF_CLOCK_CLOCK_TASKS_LFCLKSTART, 1);
-    Pip_in(PIP_NRF_CLOCK_CLOCK_EVENTS_LFCLKSTARTED, &reg);
-    while (reg == 0) {
-        Pip_in(PIP_NRF_CLOCK_CLOCK_EVENTS_LFCLKSTARTED, &reg);
-    }
+    while (Pip_in(PIP_NRF_CLOCK_CLOCK_EVENTS_LFCLKSTARTED) == 0) {}
 
     /* calibrate the RC LF clock if applicable */
 #if (CLOCK_HFCLK && (CLOCK_LFCLK == 0))
     Pip_out(PIP_NRF_CLOCK_CLOCK_EVENTS_DONE, 0);
     Pip_out(PIP_NRF_CLOCK_CLOCK_TASKS_CAL, 1);
-    Pip_in(PIP_NRF_CLOCK_CLOCK_EVENTS_DONE, &reg);
-    while (reg == 0) {
-        Pip_in(PIP_NRF_CLOCK_CLOCK_EVENTS_DONE, &reg);
-    }
+    while (Pip_in(PIP_NRF_CLOCK_CLOCK_EVENTS_DONE) == 0) {}
 #endif
 }
 
 void clock_stop_lf(void)
 {
-    uint32_t reg;
-
     Pip_out(PIP_NRF_CLOCK_CLOCK_TASKS_LFCLKSTOP, 1);
-    Pip_in(PIP_NRF_CLOCK_CLOCK_LFCLKSTAT, &reg);
-    while (reg & CLOCK_LFCLKSTAT_STATE_Msk) {
-        Pip_in(PIP_NRF_CLOCK_CLOCK_LFCLKSTAT, &reg);
-    }
+    while (Pip_in(PIP_NRF_CLOCK_CLOCK_LFCLKSTAT) & CLOCK_LFCLKSTAT_STATE_Msk) {}
 }

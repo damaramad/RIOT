@@ -137,18 +137,12 @@ static void _enable(void)
  */
 static void _go_idle(void)
 {
-    uint32_t reg;
-
     if (!(_state & STATE_BUSY)) {
         Pip_out(PIP_NRF_RADIO_RADIO_INTENCLR, INT_DIS);
         Pip_out(PIP_NRF_RADIO_RADIO_SHORTS, 0);
         Pip_out(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED, 0);
         Pip_out(PIP_NRF_RADIO_RADIO_TASKS_DISABLE, 1);
-
-        Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED, &reg);
-        while (reg == 0) {
-            Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED, &reg);
-	}
+        while (Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED) == 0) {}
         clock_hfxo_release();
         _state = STATE_IDLE;
     }
@@ -178,11 +172,9 @@ static void _set_context(netdev_ble_ctx_t *ctx)
 
 static int16_t _nrfble_get_txpower(void)
 {
-    uint32_t reg;
     int8_t p;
 
-    Pip_in(PIP_NRF_RADIO_RADIO_TXPOWER, &reg);
-    int8_t p = (int8_t)reg;
+    int8_t p = (int8_t)Pip_in(PIP_NRF_RADIO_RADIO_TXPOWER);
     if (p < 0) {
         return (int16_t)(0xff00 | p);
     }
@@ -222,22 +214,17 @@ static void _nrfble_set_txpower(int16_t power)
  */
 void isr_radio(void)
 {
-    uint32_t reg;
-
-    Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_ADDRESS, &reg);
-    if (reg) {
+    if (Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_ADDRESS)) {
         Pip_out(PIP_NRF_RADIO_RADIO_EVENTS_ADDRESS, 0);
         _state |= STATE_BUSY;
     }
 
-    Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED, &reg);
-    if (reg) {
+    if (Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED)) {
         Pip_out(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED, 0);
 
         if (_state == (STATE_BUSY | STATE_RX)) {
             _state = STATE_TX;
-            Pip_in(PIP_NRF_RADIO_RADIO_CRCSTATUS, &reg);
-            if (reg) {
+            if (Pip_in(PIP_NRF_RADIO_RADIO_CRCSTATUS)) {
                 _ctx->crc |= NETDEV_BLE_CRC_OK;
             }
             else {

@@ -77,10 +77,7 @@ void rtt_clear_overflow_cb(void)
 
 uint32_t rtt_get_counter(void)
 {
-    uint32_t reg;
-
-    Pip_in(DEV + PIP_NRF_RTC_RTC1_COUNTER_INDEX, &reg);
-    return reg;
+    return Pip_in(DEV + PIP_NRF_RTC_RTC1_COUNTER_INDEX);
 }
 
 void rtt_set_alarm(uint32_t alarm, rtt_cb_t cb, void *arg)
@@ -93,10 +90,7 @@ void rtt_set_alarm(uint32_t alarm, rtt_cb_t cb, void *arg)
 
 uint32_t rtt_get_alarm(void)
 {
-    uint32_t reg;
-
-    Pip_in(DEV + PIP_NRF_RTC_RTC1_CC_0_INDEX, &reg);
-    return reg;
+    return Pip_in(DEV + PIP_NRF_RTC_RTC1_CC_0_INDEX);
 }
 
 void rtt_clear_alarm(void)
@@ -122,17 +116,13 @@ void rtt_poweroff(void)
 
 void ISR(void)
 {
-    uint32_t reg;
-
-    Pip_in(DEV + PIP_NRF_RTC_RTC1_EVENTS_COMPARE_0_INDEX, &reg);
-    if (reg == 1) {
+    if (Pip_in(DEV + PIP_NRF_RTC_RTC1_EVENTS_COMPARE_0_INDEX) == 1) {
         Pip_out(DEV + PIP_NRF_RTC_RTC1_EVENTS_COMPARE_0_INDEX, 0);
         Pip_out(DEV + PIP_NRF_RTC_RTC1_INTENCLR_INDEX, RTC_INTENSET_COMPARE0_Msk);
         alarm_cb(alarm_arg);
     }
 
-    Pip_in(DEV + PIP_NRF_RTC_RTC1_EVENTS_OVRFLW_INDEX, &reg);
-    if (reg == 1) {
+    if (Pip_in(DEV + PIP_NRF_RTC_RTC1_EVENTS_OVRFLW_INDEX) == 1) {
         Pip_out(DEV + PIP_NRF_RTC_RTC1_EVENTS_OVRFLW_INDEX, 0);
         overflow_cb(overflow_arg);
     }

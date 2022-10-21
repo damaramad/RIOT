@@ -110,8 +110,6 @@ int timer_set_absolute(tim_t tim, int chan, unsigned int value)
 
 int timer_set_periodic(tim_t tim, int chan, unsigned int value, uint8_t flags)
 {
-    uint32_t reg;
-
     /* see if channel is valid */
     if (chan >= timer_config[tim].channels) {
         return -1;
@@ -121,9 +119,8 @@ int timer_set_periodic(tim_t tim, int chan, unsigned int value, uint8_t flags)
     ctx[tim].is_periodic |= (1 << chan);
     Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_CC_0_INDEX + chan, value);
     if (flags & TIM_FLAG_RESET_ON_MATCH) {
-        Pip_in(dev(tim) + PIP_NRF_TIMER_TIMER1_SHORTS_INDEX, &reg);
-        reg |= (1 << chan);
-        Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_SHORTS_INDEX, reg);
+        Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_SHORTS_INDEX,
+            Pip_in(dev(tim) + PIP_NRF_TIMER_TIMER1_SHORTS_INDEX) | (1 << chan));
     }
     if (flags & TIM_FLAG_RESET_ON_SET) {
         Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_TASKS_CLEAR_INDEX, 1);
@@ -137,8 +134,6 @@ int timer_set_periodic(tim_t tim, int chan, unsigned int value, uint8_t flags)
 
 int timer_clear(tim_t tim, int chan)
 {
-    uint32_t reg;
-
     /* see if channel is valid */
     if (chan >= timer_config[tim].channels) {
         return -1;
@@ -146,9 +141,8 @@ int timer_clear(tim_t tim, int chan)
 
     Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_INTENCLR_INDEX, (TIMER_INTENSET_COMPARE0_Msk << chan));
     /* Clear out the Compare->Clear flag of this channel */
-    Pip_in(dev(tim) + PIP_NRF_TIMER_TIMER1_SHORTS_INDEX, &reg);
-    reg &= ~(1 << chan);
-    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_SHORTS_INDEX, reg);
+    Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_SHORTS_INDEX,
+        Pip_in(dev(tim) + PIP_NRF_TIMER_TIMER1_SHORTS_INDEX) & ~(1 << chan));
     ctx[tim].flags &= ~(1 << chan);
     ctx[tim].is_periodic &= ~(1 << chan);
 
@@ -157,11 +151,8 @@ int timer_clear(tim_t tim, int chan)
 
 unsigned int timer_read(tim_t tim)
 {
-    uint32_t reg;
-
     Pip_out(dev(tim) + PIP_NRF_TIMER_TIMER1_TASKS_CAPTURE_0_INDEX + timer_config[tim].channels, 1);
-    Pip_in(dev(tim) + PIP_NRF_TIMER_TIMER1_CC_0_INDEX + timer_config[tim].channels, &reg);
-    return (int)reg;
+    return (int)Pip_in(dev(tim) + PIP_NRF_TIMER_TIMER1_CC_0_INDEX + timer_config[tim].channels);
 }
 
 void timer_start(tim_t tim)
@@ -176,11 +167,8 @@ void timer_stop(tim_t tim)
 
 static inline void irq_handler(int num)
 {
-    uint32_t reg;
-
     for (unsigned i = 0; i < timer_config[num].channels; i++) {
-        Pip_in(dev(num) + PIP_NRF_TIMER_TIMER1_EVENTS_COMPARE_0_INDEX + i, &reg);
-        if (reg == 1) {
+        if (Pip_in(dev(num) + PIP_NRF_TIMER_TIMER1_EVENTS_COMPARE_0_INDEX + i) == 1) {
             Pip_out(dev(num) + PIP_NRF_TIMER_TIMER1_EVENTS_COMPARE_0_INDEX + i, 0);
             if (ctx[num].flags & (1 << i)) {
                 if ((ctx[num].is_periodic & (1 << i)) == 0) {

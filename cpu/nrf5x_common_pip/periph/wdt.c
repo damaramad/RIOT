@@ -73,7 +73,6 @@ void wdt_kick(void)
 void wdt_setup_reboot(uint32_t min_time, uint32_t max_time)
 {
     (void)min_time;
-    uint32_t reg;
 
     /* Windowed wdt not supported */
     assert(min_time == 0);
@@ -83,30 +82,23 @@ void wdt_setup_reboot(uint32_t min_time, uint32_t max_time)
            (max_time < NWDT_TIME_UPPER_LIMIT));
 
     /* configure watchdog behavior during sleep */
-    Pip_in(PIP_NRF_WDT_WDT_CONFIG, &reg);
-    reg &= ~(WDT_CONFIG_SLEEP_Msk << WDT_CONFIG_SLEEP_Pos);
-    Pip_out(PIP_NRF_WDT_WDT_CONFIG, reg);
-
-    Pip_in(PIP_NRF_WDT_WDT_CONFIG, &reg);
-    reg |= (NRF_WDT_SLEEP_MODE << WDT_CONFIG_SLEEP_Pos);
-    Pip_out(PIP_NRF_WDT_WDT_CONFIG, reg);
+    Pip_out(PIP_NRF_WDT_WDT_CONFIG,
+        Pip_in(PIP_NRF_WDT_WDT_CONFIG) & ~(WDT_CONFIG_SLEEP_Msk << WDT_CONFIG_SLEEP_Pos));
+    Pip_out(PIP_NRF_WDT_WDT_CONFIG,
+        Pip_in(PIP_NRF_WDT_WDT_CONFIG) | (NRF_WDT_SLEEP_MODE << WDT_CONFIG_SLEEP_Pos));
 
     /* configure watchdog behavior during debug */
-    Pip_in(PIP_NRF_WDT_WDT_CONFIG, &reg);
-    reg &= ~(WDT_CONFIG_HALT_Msk << WDT_CONFIG_HALT_Pos);
-    Pip_out(PIP_NRF_WDT_WDT_CONFIG, reg);
-
-    Pip_in(PIP_NRF_WDT_WDT_CONFIG, &reg);
-    reg |= (NRF_WDT_HALT_MODE << WDT_CONFIG_HALT_Pos);
-    Pip_out(PIP_NRF_WDT_WDT_CONFIG, reg);
+    Pip_out(PIP_NRF_WDT_WDT_CONFIG,
+        Pip_in(PIP_NRF_WDT_WDT_CONFIG) & ~(WDT_CONFIG_HALT_Msk << WDT_CONFIG_HALT_Pos));
+    Pip_out(PIP_NRF_WDT_WDT_CONFIG,
+        Pip_in(PIP_NRF_WDT_WDT_CONFIG) | (NRF_WDT_HALT_MODE << WDT_CONFIG_HALT_Pos));
 
     /* timeout (s) = (CRV + 1) / 32768 */
     uint32_t crv = ((max_time << 15) / 1000) - 1;
     DEBUG("[wdt] setting CRV to %"PRIu32"\n", crv);
     Pip_out(PIP_NRF_WDT_WDT_CRV, crv);
 
-    Pip_in(PIP_NRF_WDT_WDT_CRV, &reg);
-    DEBUG("[wdt] CRV configuration: %"PRIu32"\n", reg);
+    DEBUG("[wdt] CRV configuration: %"PRIu32"\n", Pip_in(PIP_NRF_WDT_WDT_CRV));
 
     /* Enable reload requests */
     Pip_out(PIP_NRF_WDT_WDT_RREN, (WDT_RREN_RR0_Enabled << WDT_RREN_RR0_Pos));

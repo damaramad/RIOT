@@ -27,21 +27,14 @@
 
 void temperature_read(int16_t *temp)
 {
-    uint32_t reg;
-
     /* Start temperature measurement task */
     Pip_out(PIP_NRF_TEMP_TEMP_TASKS_START, 1);
 
     /* Wait for temperature measurement to be ready */
-    Pip_in(PIP_NRF_TEMP_TEMP_EVENTS_DATARDY, &reg);
-    /* takes 36us according to manual */
-    while (!reg) {
-        Pip_in(PIP_NRF_TEMP_TEMP_EVENTS_DATARDY, &reg);
-    }
+    while (!Pip_in(PIP_NRF_TEMP_TEMP_EVENTS_DATARDY)); /* takes 36us according to manual */
 
     /* temperature is in 0.25°C step, so just divide by 4 */
-    Pip_in(PIP_NRF_TEMP_TEMP_TEMP, &reg);
-    *temp = (int16_t)reg >> 2;
+    *temp = (int16_t)Pip_in(PIP_NRF_TEMP_TEMP_TEMP) >> 2;
 
     /* Clear data ready bit and stop temperature measurement task */
     Pip_out(PIP_NRF_TEMP_TEMP_EVENTS_DATARDY, 0);

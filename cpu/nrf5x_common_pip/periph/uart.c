@@ -405,7 +405,6 @@ static inline void irq_handler(uart_t uart)
 
 void uart_write(uart_t uart, const uint8_t *data, size_t len)
 {
-    uint32_t reg;
     (void)uart;
 
     for (size_t i = 0; i < len; i++) {
@@ -423,10 +422,7 @@ void uart_write(uart_t uart, const uint8_t *data, size_t len)
         /* write data into transmit register */
         Pip_out(PIP_NRF_UART_UART0_TXD, data[i]);
         /* wait for any transmission to be done */
-        Pip_in(PIP_NRF_UART_UART0_EVENTS_TXDRDY, &reg);
-        while (reg == 0) {
-            Pip_in(PIP_NRF_UART_UART0_EVENTS_TXDRDY, &reg);
-	}
+        while (Pip_in(PIP_NRF_UART_UART0_EVENTS_TXDRDY) == 0) {}
     }
 }
 
@@ -450,7 +446,6 @@ void uart_poweroff(uart_t uart)
 int uart_mode(uart_t uart, uart_data_bits_t data_bits, uart_parity_t parity,
               uart_stop_bits_t stop_bits)
 {
-    uint32_t reg;
     (void)uart;
 
     if (stop_bits != UART_STOP_BITS_1) {
@@ -466,14 +461,12 @@ int uart_mode(uart_t uart, uart_data_bits_t data_bits, uart_parity_t parity,
     }
 
     if (parity == UART_PARITY_EVEN) {
-        Pip_in(PIP_NRF_UART_UART0_CONFIG, &reg);
-        reg |= UART_CONFIG_PARITY_Msk;
-        Pip_out(PIP_NRF_UART_UART0_CONFIG, reg);
+        Pip_out(PIP_NRF_UART_UART0_CONFIG,
+            Pip_in(PIP_NRF_UART_UART0_CONFIG) | UART_CONFIG_PARITY_Msk);
     }
     else {
-        Pip_in(PIP_NRF_UART_UART0_CONFIG, &reg);
-        reg &= ~UART_CONFIG_PARITY_Msk;
-        Pip_out(PIP_NRF_UART_UART0_CONFIG, reg);
+        Pip_out(PIP_NRF_UART_UART0_CONFIG,
+            Pip_in(PIP_NRF_UART_UART0_CONFIG) & ~UART_CONFIG_PARITY_Msk);
     }
 
     return UART_OK;
@@ -481,14 +474,11 @@ int uart_mode(uart_t uart, uart_data_bits_t data_bits, uart_parity_t parity,
 
 static inline void irq_handler(uart_t uart)
 {
-    uint32_t reg;
     (void)uart;
 
-    Pip_in(PIP_NRF_UART_UART0_EVENTS_RXDRDY, &reg);
-    if (reg == 1) {
+    if (Pip_in(PIP_NRF_UART_UART0_EVENTS_RXDRDY) == 1) {
         Pip_out(PIP_NRF_UART_UART0_EVENTS_RXDRDY, 0);
-        Pip_in(PIP_NRF_UART_UART0_RXD, &reg);
-        uint8_t byte = (uint8_t)(reg & 0xff);
+        uint8_t byte = (uint8_t)(Pip_in(PIP_NRF_UART_UART0_RXD) & 0xff);
         isr_ctx.rx_cb(isr_ctx.arg, byte);
     }
 

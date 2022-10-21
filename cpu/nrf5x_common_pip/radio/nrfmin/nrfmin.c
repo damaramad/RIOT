@@ -140,16 +140,10 @@ static volatile uint8_t rx_lock = 0;
  */
 static void go_idle(void)
 {
-    uint32_t reg;
-
     /* set device into basic disabled state */
     Pip_out(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED, 0);
     Pip_out(PIP_NRF_RADIO_RADIO_TASKS_DISABLE, 1);
-
-    Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED, &reg);
-    while (reg == 0) {
-        Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED, &reg);
-    }
+    while (Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_DISABLED) == 0) {}
     /* also release any existing lock on the RX buffer */
     rx_lock = 0;
     state = STATE_IDLE;
@@ -164,8 +158,6 @@ static void go_idle(void)
  */
 static void goto_target_state(void)
 {
-    uint32_t reg;
-
     go_idle();
 
     if ((target_state == STATE_RX) && (rx_buf.pkt.hdr.len == 0)) {
@@ -176,11 +168,7 @@ static void goto_target_state(void)
         /* goto RX mode */
         Pip_out(PIP_NRF_RADIO_RADIO_EVENTS_READY, 0);
         Pip_out(PIP_NRF_RADIO_RADIO_TASKS_RXEN, 1);
-
-        Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_READY, &reg);
-        while (reg == 0) {
-            Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_READY, &reg);
-	}
+        while (Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_READY == 0) {}
         state = STATE_RX;
     }
 
@@ -204,10 +192,7 @@ uint16_t nrfmin_get_addr(void)
 
 uint16_t nrfmin_get_channel(void)
 {
-    uint32_t reg;
-
-    Pip_in(PIP_NRF_RADIO_RADIO_FREQUENCY, &reg);
-    return (uint16_t)(reg >> 2);
+    return (uint16_t)(Pip_in(PIP_NRF_RADIO_RADIO_FREQUENCY) >> 2);
 }
 
 netopt_state_t nrfmin_get_state(void)
@@ -223,11 +208,7 @@ netopt_state_t nrfmin_get_state(void)
 
 int16_t nrfmin_get_txpower(void)
 {
-    uint32_t reg;
-    int8_t p;
-
-    Pip_in(PIP_NRF_RADIO_RADIO_TXPOWER, &reg);
-    int8_t p = (int8_t)p;
+    int8_t p = (int8_t)Pip_in(PIP_NRF_RADIO_RADIO_TXPOWER);
     if (p < 0) {
         return (int16_t)(0xff00 | p);
     }
@@ -310,16 +291,12 @@ int nrfmin_set_state(netopt_state_t val)
  */
 void isr_radio(void)
 {
-    uint32_t reg;
-
-    Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_END, &reg);
-    if (reg == 1) {
+    if (Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_END) == 1) {
         Pip_out(PIP_NRF_RADIO_RADIO_EVENTS_END, 0);
         /* did we just send or receive something? */
         if (state == STATE_RX) {
             /* drop packet on invalid CRC */
-            Pip_in(PIP_NRF_RADIO_RADIO_CRCSTATUS, &reg);
-            if ((reg != 1) || !(nrfmin_dev.event_callback)) {
+            if ((Pip_in(PIP_NRF_RADIO_RADIO_CRCSTATUS) != 1) || !(nrfmin_dev.event_callback)) {
                 rx_buf.pkt.hdr.len = 0;
                 Pip_out(PIP_NRF_RADIO_RADIO_TASKS_START, 1);
             }
@@ -369,11 +346,7 @@ static int nrfmin_send(netdev_t *dev, const iolist_t *iolist)
     DEBUG("[nrfmin] send: putting %i byte into the ether\n", (int)hdr->len);
     Pip_out(PIP_NRF_RADIO_RADIO_EVENTS_READY, 0);
     Pip_out(PIP_NRF_RADIO_RADIO_TASKS_TXEN, 1);
-
-    Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_READY, &reg);
-    while (reg == 0) {
-        Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_READY, &reg);
-    }
+    while (Pip_in(PIP_NRF_RADIO_RADIO_EVENTS_READY) == 0) {}
     state = STATE_TX;
 
     return (int)pos;
