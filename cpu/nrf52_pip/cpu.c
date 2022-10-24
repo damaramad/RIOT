@@ -57,8 +57,8 @@ void cpu_init(void)
     /* Workaround for FTPAN-36
      * "CLOCK: Some registers are not reset when expected." */
     if (ftpan_36()) {
-        Pip_in(PIP_NRF_CLOCK_CLOCK_EVENTS_DONE, 0);
-        Pip_in(PIP_NRF_CLOCK_CLOCK_EVENTS_CTTO, 0);
+        Pip_out(PIP_NRF_CLOCK_CLOCK_EVENTS_DONE, 0);
+        Pip_out(PIP_NRF_CLOCK_CLOCK_EVENTS_CTTO, 0);
     }
     /* Enable the DC/DC power converter */
     nrfx_dcdc_init();
