@@ -75,7 +75,7 @@ static int finish(i2c_t dev)
     if (Pip_in(bus(dev) + PIP_NRF_TWIM_TWIM1_EVENTS_ERROR_INDEX)) {
         Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_EVENTS_ERROR_INDEX, 0);
         if (Pip_in(bus(dev) + PIP_NRF_TWIM_TWIM1_ERRORSRC_INDEX) & TWIM_ERRORSRC_ANACK_Msk) {
-            Pip_out(bus(dev) + bus(dev) + PIP_NRF_TWIM_TWIM1_ERRORSRC_INDEX, TWIM_ERRORSRC_ANACK_Msk);
+            Pip_out(bus(dev) + PIP_NRF_TWIM_TWIM1_ERRORSRC_INDEX, TWIM_ERRORSRC_ANACK_Msk);
             DEBUG("[i2c] check_error: NACK on address byte\n");
             return -ENXIO;
         }
