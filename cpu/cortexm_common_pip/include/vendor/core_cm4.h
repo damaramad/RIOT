@@ -1817,14 +1817,23 @@ __STATIC_INLINE uint32_t __NVIC_GetActive(IRQn_Type IRQn)
  */
 __STATIC_INLINE void __NVIC_SetPriority(IRQn_Type IRQn, uint32_t priority)
 {
+  uint32_t pri_idx, id;
+  uint8_t pri_val;
+
+  pri_val = (uint8_t)((priority << (8U - __NVIC_PRIO_BITS)) & (uint32_t)0xFFUL);
+
   if ((int32_t)(IRQn) >= 0)
   {
-    Pip_out(PIP_ARMV7M_SCS_NVIC_IPR0 + ((uint32_t)IRQn), (uint8_t)((priority << (8U - __NVIC_PRIO_BITS)) & (uint32_t)0xFFUL));
+    pri_idx = ((uint32_t)IRQn);
+    id = PIP_ARMV7M_SCS_NVIC_IPR0 + (pri_idx / 4UL);
   }
   else
   {
-    Pip_out(PIP_ARMV7M_SCS_SCID_SHPR1 + (((uint32_t)IRQn) & 0xFUL)-4UL, (uint8_t)((priority << (8U - __NVIC_PRIO_BITS)) & (uint32_t)0xFFUL));
+    pri_idx = (((uint32_t)IRQn) & 0xFUL) - 4UL;
+    id = PIP_ARMV7M_SCS_SCID_SHPR1 + (pri_idx / 4UL);
   }
+
+  Pip_out(id, Pip_in(id) | (pri_val << ((pri_idx % 4UL) * 8UL)));
 }
 
 
