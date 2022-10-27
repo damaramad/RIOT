@@ -11,4 +11,4 @@ all:
 # is because the directory is not created automatically, since
 # there are, for the moment, only header files and no compiled
 # object files.
-	mkdir -p $(BINDIR)/libpip
+	$(Q)mkdir -p $(BINDIR)/libpip
