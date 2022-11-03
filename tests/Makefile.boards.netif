@@ -10,6 +10,7 @@ BOARD_PROVIDES_NETIF := \
     derfmega128 \
     derfmega256 \
     dwm1001 \
+    dwm1001_pip \
     esp32-wroom-32 \
     fox \
     frdm-kw41z \
