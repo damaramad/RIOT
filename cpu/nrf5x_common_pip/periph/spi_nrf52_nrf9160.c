@@ -33,6 +33,8 @@
 #include "periph_cpu.h"
 #include <string.h>
 
+#include "svc.h"
+
 #define RAM_MASK            (0x20000000)
 
 /**
@@ -50,9 +52,9 @@ static uint8_t _mbuf[SPI_NUMOF][CONFIG_SPI_MBUF_SIZE];
 
 static void spi_isr_handler(void *arg);
 
-static inline NRF_SPIM_Type *dev(spi_t bus)
+static inline uint32_t dev(spi_t bus)
 {
-    return (NRF_SPIM_Type *)spi_config[bus].dev;
+    return spi_config[bus].dev;
 }
 
 static inline bool _in_ram(const uint8_t *data)
@@ -91,9 +93,10 @@ static void _setup_workaround_for_ftpan_58(spi_t bus)
     assert(channel != 0xff);
 
     // Stop the spim instance when SCK toggles.
-    NRF_PPI->CH[spi_config[bus].ppi].EEP =
-        (uint32_t)&NRF_GPIOTE->EVENTS_IN[channel];
-    NRF_PPI->CH[spi_config[bus].ppi].TEP = (uint32_t)&dev(bus)->TASKS_STOP;
+    Pip_out(PIP_NRF_PPI_PPI_CH_0_EEP + 2 * spi_config[bus].ppi,
+        Pip_in(PIP_NRF_GPIOTE_GPIOTE_EVENTS_IN_0 + channel));
+    Pip_out(PIP_NRF_PPI_PPI_CH_0_EEP + 2 * spi_config[bus].ppi + 1,
+        Pip_in(dev(bus) + PIP_NRF_SPIM_SPIM0_TASKS_STOP_INDEX));
 #else
     (void)bus;
 #endif
@@ -107,7 +110,7 @@ static void _enable_workaround(spi_t bus)
      * transmitting the first byte and then stop. Effectively ensuring
      * that only 1 byte is transmitted.
      */
-    NRF_PPI->CHENSET = 1U << spi_config[bus].ppi;
+    Pip_out(PIP_NRF_PPI_PPI_CHENSET, 1U << spi_config[bus].ppi);
     gpio_irq_enable(spi_config[bus].sclk);
 #else
     (void)bus;
@@ -117,7 +120,7 @@ static void _enable_workaround(spi_t bus)
 static void _clear_workaround(spi_t bus)
 {
 #ifdef ERRATA_SPI_SINGLE_BYTE_WORKAROUND
-    NRF_PPI->CHENCLR = 1U << spi_config[bus].ppi;
+    Pip_out(PIP_NRF_PPI_PPI_CHENCLR, 1U << spi_config[bus].ppi);
 #else
     (void)bus;
 #endif
@@ -165,9 +168,9 @@ void spi_init_pins(spi_t bus)
     spi_init_with_gpio_mode(bus, &gpio_modes);
 
     /* select pins for the SPI device */
-    SPI_SCKSEL = spi_config[bus].sclk;
-    SPI_MOSISEL = spi_config[bus].mosi;
-    SPI_MISOSEL = spi_config[bus].miso;
+    SPI_SCKSEL(spi_config[bus].sclk);
+    SPI_MOSISEL(spi_config[bus].mosi);
+    SPI_MISOSEL(spi_config[bus].miso);
     _setup_workaround_for_ftpan_58(bus);
     spi_twi_irq_register_spi(dev(bus), spi_isr_handler, (void *)(uintptr_t)bus);
 }
@@ -179,16 +182,16 @@ void spi_acquire(spi_t bus, spi_cs_t cs, spi_mode_t mode, spi_clk_t clk)
 
     mutex_lock(&locks[bus]);
     /* configure bus */
-    dev(bus)->CONFIG = mode;
-    dev(bus)->FREQUENCY = clk;
+    Pip_out(dev(bus) + PIP_NRF_SPIM_SPIM0_CONFIG_INDEX, mode);
+    Pip_out(dev(bus) + PIP_NRF_SPIM_SPIM0_FREQUENCY_INDEX, clk);
     /* enable the bus */
-    dev(bus)->ENABLE = SPIM_ENABLE_ENABLE_Enabled;
+    Pip_out(dev(bus) + PIP_NRF_SPIM_SPIM0_ENABLE_INDEX, SPIM_ENABLE_ENABLE_Enabled);
 }
 
 void spi_release(spi_t bus)
 {
     /* power off everything */
-    dev(bus)->ENABLE = 0;
+    Pip_out(dev(bus) + PIP_NRF_SPIM_SPIM0_ENABLE_INDEX, 0);
     mutex_unlock(&locks[bus]);
 }
 
@@ -213,15 +216,15 @@ static size_t _transfer(spi_t bus, const uint8_t *out_buf, uint8_t *in_buf,
     uint8_t out_len = (out_buf) ? transfer_len : 0;
     uint8_t in_len = (in_buf) ? transfer_len : 0;
 
-    dev(bus)->TXD.PTR = (uint32_t)out_mbuf;
-    dev(bus)->RXD.PTR = (uint32_t)in_buf;
+    Pip_out(dev(bus) + PIP_NRF_SPIM_SPIM0_TXD_PTR_INDEX, (uint32_t)out_mbuf);
+    Pip_out(dev(bus) + PIP_NRF_SPIM_SPIM0_RXD_PTR_INDEX, (uint32_t)in_buf);
 
-    dev(bus)->TXD.MAXCNT = out_len;
-    dev(bus)->RXD.MAXCNT = in_len;
+    Pip_out(dev(bus) + PIP_NRF_SPIM_SPIM0_TXD_MAXCNT_INDEX, out_len);
+    Pip_out(dev(bus) + PIP_NRF_SPIM_SPIM0_RXD_MAXCNT_INDEX, in_len);
 
     /* clear any spurious END events */
-    dev(bus)->EVENTS_END = 0;
-    dev(bus)->TASKS_START = 1;
+    Pip_out(dev(bus) + PIP_NRF_SPIM_SPIM0_EVENTS_END_INDEX, 0);
+    Pip_out(dev(bus) + PIP_NRF_SPIM_SPIM0_TASKS_START_INDEX, 1);
     return transfer_len;
 }
 
@@ -244,7 +247,7 @@ void spi_transfer_bytes(spi_t bus, spi_cs_t cs, bool cont,
     }
 
     /* Enable IRQ */
-    dev(bus)->INTENSET = SPIM_INTENSET_END_Msk;
+    Pip_out(dev(bus) + PIP_NRF_SPIM_SPIM0_INTENSET_INDEX, SPIM_INTENSET_END_Msk);
 
     do {
         size_t transfer_len = _transfer(bus, out_buf, in_buf, len);
@@ -257,7 +260,7 @@ void spi_transfer_bytes(spi_t bus, spi_cs_t cs, bool cont,
     } while (len);
 
     /* Disable IRQ */
-    dev(bus)->INTENCLR = SPIM_INTENCLR_END_Msk;
+    Pip_out(dev(bus) + PIP_NRF_SPIM_SPIM0_INTENCLR_INDEX, SPIM_INTENCLR_END_Msk);
 
     /**
      * While we could always disable the workaround, only doing this when
@@ -278,5 +281,5 @@ void spi_isr_handler(void *arg)
     spi_t bus = (spi_t)(uintptr_t)arg;
 
     mutex_unlock(&busy[bus]);
-    dev(bus)->EVENTS_END = 0;
+    Pip_out(dev(bus) + PIP_NRF_SPIM_SPIM0_EVENTS_END_INDEX, 0);
 }

@@ -23,6 +23,8 @@
 
 #include "periph_cpu_common.h"
 
+#include "svc.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -49,9 +51,9 @@ extern "C" {
  * @brief   Redefine some peripheral names to unify them between nRF51 and 52
  * @{
  */
-#define SPI_SCKSEL          (dev(bus)->PSEL.SCK)
-#define SPI_MOSISEL         (dev(bus)->PSEL.MOSI)
-#define SPI_MISOSEL         (dev(bus)->PSEL.MISO)
+#define SPI_SCKSEL(x)          Pip_out(dev(bus) + PIP_NRF_SPIM_SPIM0_PSEL_SCK_INDEX, x)
+#define SPI_MOSISEL(x)         Pip_out(dev(bus) + PIP_NRF_SPIM_SPIM0_PSEL_MOSI_INDEX, x)
+#define SPI_MISOSEL(x)         Pip_out(dev(bus) + PIP_NRF_SPIM_SPIM0_PSEL_MISO_INDEX, x)
 #ifdef CPU_MODEL_NRF52832XXAA
 #define UART_IRQN           (UARTE0_UART0_IRQn)
 #endif
