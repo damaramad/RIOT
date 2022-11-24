@@ -58,7 +58,6 @@ SECTIONS
         *(.text .text.* .gnu.linkonce.t.*)
         *(.glue_7t) *(.glue_7)
         *(.rodata .rodata* .gnu.linkonce.r.*)
-        KEEP (*(SORT(.roxfa.*)))
         *(.ARM.extab* .gnu.linkonce.armextab.*)
 
         /* Support C constructors, and C destructors in both user code
@@ -184,6 +183,8 @@ SECTIONS
     {
         . = ALIGN(4);
         __romRamStart = .;
+
+        KEEP (*(SORT(.roxfa.*)))
 
         _srelocate = .;
         *(.ramfunc .ramfunc.*);
