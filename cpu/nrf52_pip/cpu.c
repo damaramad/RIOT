@@ -51,7 +51,7 @@ void cpu_init(void)
     /* Workaround for FTPAN-37
      * "AMLI: EasyDMA is slow with Radio, ECB, AAR and CCM." */
     if (ftpan_37()) {
-        Pip_out(PIP_NRF_RADIO_RADIO_ERRATA_32, 0x3);
+        Pip_out(PIP_NRF_RADIO_ERRATA_ERRATA_32, 0x3);
     }
 
     /* Workaround for FTPAN-36
