@@ -1765,7 +1765,7 @@ __STATIC_INLINE void __NVIC_SetPendingIRQ(IRQn_Type IRQn)
 {
   if ((int32_t)(IRQn) >= 0)
   {
-    NVIC->ISPR[(((uint32_t)IRQn) >> 5UL)] = (uint32_t)(1UL << (((uint32_t)IRQn) & 0x1FUL));
+    Pip_out(PIP_ARMV7M_SCS_NVIC_ISPR0 + (((uint32_t)IRQn) >> 5UL), (uint32_t)(1UL << (((uint32_t)IRQn) & 0x1FUL)));
   }
 }
 
