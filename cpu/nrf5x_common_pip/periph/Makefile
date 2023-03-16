@@ -9,7 +9,7 @@ endif
 
 # Select the specific implementation for `periph_spi`
 ifneq (,$(filter periph_spi,$(USEMODULE)))
-  ifneq (,$(filter $(CPU_FAM),nrf52 nrf9160))
+  ifneq (,$(filter $(CPU_FAM),nrf52_pip nrf9160))
     SRC += spi_nrf52_nrf9160.c
   endif
 endif
