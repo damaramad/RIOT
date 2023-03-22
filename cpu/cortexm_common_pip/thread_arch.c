@@ -272,7 +272,7 @@ void __attribute__((used)) isr_pendsv(void) {
 
     /* yield to the elected thread without saving the
      * current context */
-    Pip_yield(riotPartDesc, 0, 46, 0, 0);
+    Pip_yield(riotPartDesc, 0, 46, 1, 1);
 }
 #else /* CPU_CORE_CORTEXM_FULL_THUMB */
 void __attribute__((naked)) __attribute__((used)) isr_pendsv(void) {

@@ -129,7 +129,15 @@ static isr_t nrf52_pip_handlers[CPU_IRQ_NUMOF] = {
 void __attribute__((noreturn)) nrf52_pip_dispatcher(void)
 {
     nrf52_pip_handlers[riotVidt->currentInterrupt - 16]();
-    Pip_yield(riotPartDesc, 0, 46, 0, 0);
+    /* Here, we want to restore the interrupted context, which
+     * is saved at the address in the index 9 of the VIDT. We do
+     * not want to save the current context, so we pass the
+     * index 46 in the VIDT, which contains a null address. The
+     * flagsOnYield does not matter since we want to restore a
+     * context in the same parition. The flagsOnWake does not
+     * matter since the current context is not saved.
+     */
+    Pip_yield(riotPartDesc, 9, 46, 0, 0);
     for (;;);
 }
 
@@ -138,6 +146,7 @@ void __attribute__((noreturn)) nrf52_pip_dispatcher(void)
  */
 static basicContext_t nrf52_pip_ctx = {
     .isBasicFrame = 1,
+    /* We must not be interrupted in exception handler. */
     .pipflags = 0,
     .frame = {
         /* The SP will be initialized in the

@@ -119,6 +119,8 @@ void start(interface_t *interface, void *gotaddr)
 
     riotGotAddr = gotaddr;
 
+    Pip_setIntState(1);
+
     /* call RIOT entry point */
     reset_handler_default();
 }
@@ -260,6 +262,7 @@ void __attribute__((noreturn)) cortexm_pip_dispatcher(void)
  */
 static basicContext_t cortexm_pip_ctx = {
     .isBasicFrame = 1,
+    /* We must not be interrupted in exception handler. */
     .pipflags = 0,
     .frame = {
         /* the SP field will be initialized in the
