@@ -319,4 +319,15 @@ void cortexm_pip_vidt_init(vidt_t *vidt)
     for (size_t i = 1; i < 16; i++) {
         vidt->contexts[i] = &cortexm_pip_ctx;
     }
+    /*
+     * The index 8 is reserved by Pip to save an interrupted context
+     * when a partition asks to be CLI. This is not relevant for the
+     * root partition.
+     */
+    vidt->contexts[8] = NULL;
+    /*
+     * The index 8 is reserved by Pip to save an interrupted context
+     * when a partition asks to be STI.
+     */
+    vidt->contexts[9] = NULL;
 }

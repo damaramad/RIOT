@@ -269,6 +269,7 @@ void __attribute__((used)) isr_pendsv(void) {
     /* update the index 0 of the VIDT of RIOT with the
      * address of the context of the elected thread */
     riotVidt->contexts[0] = (void *) addr;
+    riotVidt->contexts[9] = (void *) addr;
 
     /* yield to the elected thread without saving the
      * current context */
