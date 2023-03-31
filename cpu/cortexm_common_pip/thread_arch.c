@@ -151,7 +151,7 @@ char *thread_stack_init(thread_task_func_t task_func,
 
     /* reserve a room on the stack for the context of
      * the thread */
-    stack_size -= sizeof(basicContext_t);
+    stack_size -= sizeof(extendedContext_t);
     stack_size &= ~(0x3);
     if (stack_size < 0) {
         DEBUG("thread_stack_init: stack size is too small!\n");
@@ -259,12 +259,12 @@ void __attribute__((used)) isr_pendsv(void) {
 #else
     addr = (uintptr_t) thread;
 #endif
-    addr -= sizeof(basicContext_t);
+    addr -= sizeof(extendedContext_t);
     addr &= ~(0x3);
 
     /* update the stack pointer of the thread_t structure
      * for consistency */
-    thread->sp = (char *)((basicContext_t *) addr)->frame.sp;
+    thread->sp = (char *)((extendedContext_t *) addr)->frame.sp;
 
     /* update the index 0 of the VIDT of RIOT with the
      * address of the context of the elected thread */
