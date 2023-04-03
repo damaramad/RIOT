@@ -314,6 +314,7 @@ void cortexm_pip_ctx_init(void *sp, void *sl)
  */
 void cortexm_pip_vidt_init(vidt_t *vidt)
 {
+    vidt->currentInterrupt = 0;
     /* the index 0 is reserved for the current thread */
     vidt->contexts[0] = NULL;
     for (size_t i = 1; i < 16; i++) {
