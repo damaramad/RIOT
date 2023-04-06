@@ -30,6 +30,10 @@
 extern vidt_t *riotVidt;
 extern void *riotPartDesc;
 
+/* Minimum stack size. @see Figure B1-3 Alignment options when stacking the basic frame. */
+#define DUMMY_STACK_SIZE 0x24
+static char dummy_stack[DUMMY_STACK_SIZE];
+
 /* define a local dummy handler as it needs to be in the same compilation unit
  * as the alias definition */
 void dummy_handler(void) {
@@ -81,7 +85,7 @@ WEAK_DEFAULT void isr_fpu(void);
 /**
  * @brief   Handlers for each nRF52832 interrupt.
  */
-static isr_t nrf52_pip_handlers[CPU_IRQ_NUMOF] = {
+static isr_t __attribute((used)) nrf52_pip_handlers[CPU_IRQ_NUMOF] = {
     isr_power_clock,       /* power_clock */
     isr_radio,             /* radio */
     isr_uart0,             /* uart0 */
@@ -126,19 +130,53 @@ static isr_t nrf52_pip_handlers[CPU_IRQ_NUMOF] = {
 /**
  * @brief   Interrupt dispatcher for each nRF52832 interrupt.
  */
-void __attribute__((noreturn)) nrf52_pip_dispatcher(void)
+void __attribute__((naked)) nrf52_pip_dispatcher(void)
 {
-    nrf52_pip_handlers[riotVidt->currentInterrupt - 16]();
-    /* Here, we want to restore the interrupted context, which
-     * is saved at the address in the index 9 of the VIDT. We do
-     * not want to save the current context, so we pass the
-     * index 46 in the VIDT, which contains a null address. The
-     * flagsOnYield does not matter since we want to restore a
-     * context in the same parition. The flagsOnWake does not
-     * matter since the current context is not saved.
+    /*
+     * We use r4-r8 because they are callee-saved registers.
      */
-    Pip_yield(riotPartDesc, 9, 46, 0, 0);
-    for (;;);
+    __asm__ volatile
+    (
+        "ldr    r4, .L1                \n"
+        "ldr    r4, [r10, r4]          \n"
+        "ldr    r4, [r4]               \n"
+        "ldr    r5, [r4, #40]          \n"
+        "ldr    r6, [r5]               \n"
+        "cmp    r6, #0                 \n"
+        "ittee  eq                     \n"
+        "ldreq  r6, [r5, #72]          \n"
+        "subeq  r6, #0x68              \n"
+        "ldrne  r6, [r5, #8]           \n"
+        "subne  r6, #0x20              \n"
+        "bic    r6, #4                 \n"
+        "ite    eq                     \n"
+        "subeq  r6, #108               \n"
+        "subne  r6, #44                \n"
+        "ldr    r5, [r5, #4]           \n"
+        "str    r5, [r6, #4]           \n"
+        "mov    sp, r6                 \n"
+        "ldr    r5, [r4]               \n"
+        "subs   r5, #16                \n"
+        "ldr    r6, .L1+4              \n"
+        "ldr    r6, [r10, r6]          \n"
+        "ldr    r6, [r6, r5, lsl #2]   \n"
+        "blx    r6                     \n"
+        "str    sp, [r4, #4]           \n"
+        "ldr    r4, .L1+8              \n"
+        "ldr    r0, [r10, r4]          \n"
+        "ldr    r0, [r0]               \n"
+        "movs   r1, #0                 \n"
+        "movs   r2, #46                \n"
+        "movs   r3, #0                 \n"
+        "movs   r4, #0                 \n"
+        "svc    #12                    \n"
+        "b      .                      \n"
+        ".align 2                      \n"
+        ".L1:                          \n"
+        ".word riotVidt(GOT)           \n"
+        ".word nrf52_pip_handlers(GOT) \n"
+        ".word riotPartDesc(GOT)       \n"
+    );
 }
 
 /**
@@ -149,10 +187,7 @@ static basicContext_t nrf52_pip_ctx = {
     /* We must not be interrupted in exception handler. */
     .pipflags = 0,
     .frame = {
-        /* The SP will be initialized in the
-	 * start() function because its value will
-	 * only be known at runtime. */
-        .sp = 0,
+        .sp = (uint32_t)dummy_stack + DUMMY_STACK_SIZE,
         .r4 = 0,
         .r5 = 0,
         .r6 = 0,
@@ -185,7 +220,7 @@ static basicContext_t nrf52_pip_ctx = {
  */
 void nrf52_pip_ctx_init(void *sp, void *sl)
 {
-    nrf52_pip_ctx.frame.sp = (uint32_t) sp;
+    (void)sp;
     nrf52_pip_ctx.frame.r10 = (uint32_t) sl;
 }
 

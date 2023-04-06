@@ -146,45 +146,56 @@ char *thread_stack_init(thread_task_func_t task_func,
                              void *stack_start,
                              int stack_size)
 {
-    basicContext_t *ctx;
-    uint32_t *sp;
+    uintptr_t sp = (uintptr_t)stack_start + (uintptr_t)stack_size;
 
-    /* reserve a room on the stack for the context of
-     * the thread */
-    stack_size -= sizeof(extendedContext_t);
-    stack_size &= ~(0x3);
-    if (stack_size < 0) {
-        DEBUG("thread_stack_init: stack size is too small!\n");
-        /* XXX: What should we do? */
-        for (;;);
-    }
-    ctx = (basicContext_t *)(uintptr_t)(stack_start + stack_size);
+    /* align sp to a four-byte boundary */
+    sp &= ~(0x3);
 
-    /* prepare the stack of the thread */
-    sp = (uint32_t *) ctx;
-    sp--;
-    *sp = STACK_MARKER;
-    sp--;
-    if (((uint32_t) sp & 0x7) != 0) {
+    sp -= sizeof(extendedContext_t);
+
+    void *ctx = (void *) sp;
+
+    /* reserved place for the stack marker */
+    sp -= sizeof(void *);
+    *(uint32_t *) sp = STACK_MARKER;
+    sp -= sizeof(void *);
+
+    /* align sp to a eight-byte boundray */
+    if ((sp & 0x7) != 0) {
         /* add a single word padding */
-        --sp;
-        *sp = ~((uint32_t)STACK_MARKER);
+        sp -= sizeof(void *);
+        *(uint32_t *) sp = ~((uint32_t)STACK_MARKER);
     }
 
-    /* initialize each register of the thread */
+    void * initial_sp = (void *) sp;
+
+    sp -= sizeof(basicContext_t);
+
+    void *ctx2 = (void *) sp;
+
+    for (size_t i = 0; i < EXTENDED_FRAME_SIZE; i++) {
+        ((extendedContext_t *)ctx)->frame.registers[i] = 0;
+    }
+
     for (size_t i = 0; i < BASIC_FRAME_SIZE; i++) {
-        ctx->frame.registers[i] = 0;
+        ((basicContext_t *)ctx2)->frame.registers[i] = 0;
     }
 
-    /* prepare the context pf the thread */
-    ctx->isBasicFrame = 1;
-    ctx->pipflags = 0;
-    ctx->frame.r0 = (uint32_t) arg;
-    ctx->frame.r10 = (uint32_t) riotGotAddr;
-    ctx->frame.pc = (uint32_t) task_func;
-    ctx->frame.sp = (uint32_t) sp;
+    ((basicContext_t *) ctx)->isBasicFrame  = 1;
+    ((basicContext_t *) ctx)->pipflags      = 1;
+    ((basicContext_t *) ctx)->frame.r0      = (uint32_t) arg;
+    ((basicContext_t *) ctx)->frame.r10     = (uint32_t) riotGotAddr;
+    ((basicContext_t *) ctx)->frame.pc      = (uint32_t) task_func;
+    ((basicContext_t *) ctx)->frame.sp      = (uint32_t) initial_sp;
 
-    return (char*) sp;
+    ((basicContext_t *) ctx2)->isBasicFrame = 1;
+    ((basicContext_t *) ctx2)->pipflags     = 1;
+    ((basicContext_t *) ctx2)->frame.r0     = (uint32_t) arg;
+    ((basicContext_t *) ctx2)->frame.r10    = (uint32_t) riotGotAddr;
+    ((basicContext_t *) ctx2)->frame.pc     = (uint32_t) task_func;
+    ((basicContext_t *) ctx2)->frame.sp     = (uint32_t) initial_sp;
+
+    return (char *) sp;
 }
 
 void thread_stack_print(void)
@@ -248,9 +259,17 @@ void NORETURN cpu_switch_context_exit(void)
 void __attribute__((used)) isr_pendsv(void) {
     thread_t *thread;
     uintptr_t addr;
+    void *ctx;
+
+    extern volatile thread_t *sched_active_thread;
+    void *active = (void *)sched_active_thread;
 
     /* election of the thread to execute */
     thread = sched_run();
+
+    if (active == thread) {
+        return;
+    }
 
     /* retrieve the address of the context stored on the
      * stack of the elected thread */
@@ -264,11 +283,23 @@ void __attribute__((used)) isr_pendsv(void) {
 
     /* update the stack pointer of the thread_t structure
      * for consistency */
-    thread->sp = (char *)((extendedContext_t *) addr)->frame.sp;
+    switch (*(uint32_t *) addr) {
+        case 0:
+            thread->sp = (char *)((extendedContext_t *) addr)->frame.sp;
+            ctx = (void *)((((uintptr_t)thread->sp - 0x68) & 0xfffffffb) - 108);
+            break;
+        case 1:
+            thread->sp = (char *)((basicContext_t *) addr)->frame.sp;
+            ctx = (void *)((((uintptr_t)thread->sp - 0x20) & 0xfffffffb) - 44);
+            break;
+        default:
+            /* XXX: corrupted context... what should we do? */
+            for (;;);
+    }
 
     /* update the index 0 of the VIDT of RIOT with the
      * address of the context of the elected thread */
-    riotVidt->contexts[0] = (void *) addr;
+    riotVidt->contexts[0] = (void *) ctx;
     riotVidt->contexts[9] = (void *) addr;
 
     /* yield to the elected thread without saving the
@@ -439,7 +470,7 @@ void sched_arch_idle(void)
     void pm_set_lowest(void);
     pm_set_lowest();
 #else
-    __WFI();
+    /*__WFI();*/
 #endif
     /* Briefly re-enable IRQs to allow pending interrupts to be serviced and
      * have them update the runqueue */

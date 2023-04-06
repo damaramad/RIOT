@@ -215,7 +215,7 @@ __attribute__((weak, alias("dummy_handler_default"))) void isr_systick(void);
 /**
  * @brief   Handlers for each Cortex-M interrupt.
  */
-static const isr_t
+static const isr_t __attribute__((used))
 cortexm_pip_handlers[CORTEX_IRQ_NUMOF] =
 {
     [ 0] = reset_handler_default,
@@ -251,10 +251,55 @@ cortexm_pip_handlers[CORTEX_IRQ_NUMOF] =
 /**
  * @brief   Interrupt dispatcher for each Cortex-M interrupt.
  */
-void __attribute__((noreturn)) cortexm_pip_dispatcher(void)
+void __attribute__((naked)) cortexm_pip_dispatcher(void)
 {
-    cortexm_pip_handlers[riotVidt->currentInterrupt - 1]();
-    for (;;);
+    /*
+     * We use r4-r8 because they are callee-saved registers.
+     */
+    __asm__ volatile
+    (
+        "ldr    r4, .L1                \n"
+        "ldr    r4, [r10, r4]          \n"
+        "ldr    r4, [r4]               \n"
+        "ldr    r5, [r4, #40]          \n"
+        "cbz    r5, 1f                 \n"
+        "ldr    r6, [r5]               \n"
+        "cmp    r6, #0                 \n"
+        "ittee  eq                     \n"
+        "ldreq  r6, [r5, #72]          \n"
+        "subeq  r6, #0x68              \n"
+        "ldrne  r6, [r5, #8]           \n"
+        "subne  r6, #0x20              \n"
+        "bic    r6, #4                 \n"
+        "ite    eq                     \n"
+        "subeq  r6, #108               \n"
+        "subne  r6, #44                \n"
+        "ldr    r5, [r5, #4]           \n"
+        "str    r5, [r6, #4]           \n"
+        "mov    sp, r6                 \n"
+        "1:                            \n"
+        "ldr    r5, [r4]               \n"
+        "subs   r5, #1                 \n"
+        "ldr    r6, .L1+4              \n"
+        "ldr    r6, [r10, r6]          \n"
+        "ldr    r6, [r6, r5, lsl #2]   \n"
+        "blx    r6                     \n"
+        "str    sp, [r4, #4]           \n"
+        "ldr    r4, .L1+8              \n"
+        "ldr    r0, [r10, r4]          \n"
+        "ldr    r0, [r0]               \n"
+        "movs   r1, #0                 \n"
+        "movs   r2, #46                \n"
+        "movs   r3, #0                 \n"
+        "movs   r4, #0                 \n"
+        "svc    #12                    \n"
+        "b      .                      \n"
+        ".align 2                      \n"
+        ".L1:                          \n"
+        ".word riotVidt(GOT)           \n"
+        ".word cortexm_pip_handlers(GOT) \n"
+        ".word riotPartDesc(GOT)       \n"
+    );
 }
 
 /**
