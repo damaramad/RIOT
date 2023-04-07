@@ -59,8 +59,7 @@
  * @brief   Memory markers, defined in the linker script
  * @{
  */
-uint32_t *_sstack;
-extern uint32_t _estack;
+static uint32_t *sstack;
 extern uint8_t _sram;
 extern uint8_t _eram;
 /** @} */
@@ -68,11 +67,6 @@ extern uint8_t _eram;
 void *riotPartDesc;
 void *riotGotAddr;
 vidt_t *riotVidt;
-
-/**
- * @brief   Allocation of the interrupt stack
- */
-__attribute__((used,section(".isr_stack"))) uint8_t isr_stack[ISR_STACKSIZE];
 
 /**
  * @brief   Pre-start routine for CPU-specific settings
@@ -99,7 +93,7 @@ void start(interface_t *interface, void *gotaddr)
 
     /* initialization of global variables with
      * values only known at runtime */
-    _sstack = (uint32_t *) interface->stackLimit;
+    sstack = (uint32_t *)interface->stackLimit;
 
     extern void cortexm_pip_ctx_init(void *sp, void *sl);
     cortexm_pip_ctx_init(interface->stackTop, gotaddr);
@@ -127,18 +121,16 @@ void start(interface_t *interface, void *gotaddr)
 
 void reset_handler_default(void)
 {
-    uint32_t *dst;
-
     pre_startup();
 
 #ifdef DEVELHELP
     /* cppcheck-suppress constVariable
      * (top is modified by asm) */
-    uint32_t *top;
+    uint32_t *dst, *top;
     /* Fill stack space with canary values up until the current stack pointer */
     /* Read current stack pointer from CPU register */
     __asm__ volatile ("mov %[top], sp" : [top] "=r" (top) : : );
-    dst = _sstack;
+    dst = sstack;
     while (dst < top) {
         *(dst++) = STACK_CANARY_WORD;
     }

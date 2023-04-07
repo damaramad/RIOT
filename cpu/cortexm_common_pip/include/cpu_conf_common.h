@@ -49,15 +49,6 @@ extern "C" {
 /** @} */
 
 /**
- * @brief   Stack size used for the exception (ISR) stack
- * @{
- */
-#ifndef ISR_STACKSIZE
-#define ISR_STACKSIZE                   (512U)
-#endif
-/** @} */
-
-/**
  * @brief   Select fastest bitarithm_lsb implementation
  * @{
  */

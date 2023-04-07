@@ -105,10 +105,8 @@
 #include "debug.h"
 
 extern void *riotPartDesc;
-extern vidt_t *riotVidt;
 extern void *riotGotAddr;
-extern uint32_t _estack;
-extern uint32_t _sstack;
+extern vidt_t *riotVidt;
 
 /**
  * @brief   CPU core supports full Thumb instruction set
@@ -219,30 +217,22 @@ void thread_stack_print(void)
     printf("current stack size: %i byte\n", count);
 }
 
-/* This function returns the number of bytes used on the ISR stack */
 int thread_isr_stack_usage(void)
 {
-    uint32_t *ptr = &_sstack;
-
-    /* cppcheck-suppress comparePointers */
-    while (((*ptr) == STACK_CANARY_WORD) && (ptr < &_estack)) {
-        ++ptr;
-    }
-
-    /* cppcheck-suppress comparePointers */
-    ptrdiff_t num_used_words = &_estack - ptr;
-    return num_used_words * sizeof(*ptr);
+    /* there is no ISR stack */
+    return 0;
 }
 
 void *thread_isr_stack_pointer(void)
 {
-    void *msp = (void *)__get_MSP();
-    return msp;
+    /* there is no ISR stack */
+    return NULL;
 }
 
 void *thread_isr_stack_start(void)
 {
-    return (void *)&_sstack;
+    /* there is no ISR stack */
+    return NULL;
 }
 
 void NORETURN cpu_switch_context_exit(void)
