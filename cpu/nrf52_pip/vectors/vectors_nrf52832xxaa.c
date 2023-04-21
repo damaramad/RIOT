@@ -30,10 +30,6 @@
 extern vidt_t *riotVidt;
 extern void *riotPartDesc;
 
-/* Minimum stack size. @see Figure B1-3 Alignment options when stacking the basic frame. */
-#define DUMMY_STACK_SIZE 0x24
-static char dummy_stack[DUMMY_STACK_SIZE];
-
 /* define a local dummy handler as it needs to be in the same compilation unit
  * as the alias definition */
 void dummy_handler(void) {
@@ -129,6 +125,26 @@ static isr_t __attribute((used)) nrf52_pip_handlers[CPU_IRQ_NUMOF] = {
 
 /**
  * @brief   Interrupt dispatcher for each nRF52832 interrupt.
+ *
+ * 1. Retrieves the context address of the interrupted thread at
+ *    the index 9 of the VIDT;
+ *
+ * 2. Computes the stack top address, i.e. the address where the
+ *    context of the interrupted thread is located on its stack;
+ *
+ * 3. Moves the stack pointer to the address where the context
+ *    of the interrupted thread is located on its stack;
+ *
+ * 4. Executes the handler corresponding to the interrupt number;
+ *
+ * 5. Stores the address of the interrupted thread's context on
+ *    its stack at index 0 of the VIDT;
+ *
+ * 6. Executes the system call yield to restore the context at
+ *    index 0 of the VIDT.
+ *
+ * This behavior allows stacking interrupt contexts in the
+ * manner of RIOT.
  */
 void __attribute__((naked)) nrf52_pip_dispatcher(void)
 {
@@ -137,45 +153,83 @@ void __attribute__((naked)) nrf52_pip_dispatcher(void)
      */
     __asm__ volatile
     (
-        "ldr    r4, .L1                \n"
-        "ldr    r4, [r10, r4]          \n"
-        "ldr    r4, [r4]               \n"
-        "ldr    r5, [r4, #40]          \n"
-        "ldr    r6, [r5]               \n"
-        "cmp    r6, #0                 \n"
-        "ittee  eq                     \n"
-        "ldreq  r6, [r5, #72]          \n"
-        "subeq  r6, #0x68              \n"
-        "ldrne  r6, [r5, #8]           \n"
-        "subne  r6, #0x20              \n"
-        "bic    r6, #4                 \n"
-        "ite    eq                     \n"
-        "subeq  r6, #108               \n"
-        "subne  r6, #44                \n"
-        "ldr    r5, [r5, #4]           \n"
-        "str    r5, [r6, #4]           \n"
-        "mov    sp, r6                 \n"
-        "ldr    r5, [r4]               \n"
-        "subs   r5, #16                \n"
-        "ldr    r6, .L1+4              \n"
-        "ldr    r6, [r10, r6]          \n"
-        "ldr    r6, [r6, r5, lsl #2]   \n"
-        "blx    r6                     \n"
-        "str    sp, [r4, #4]           \n"
-        "ldr    r4, .L1+8              \n"
-        "ldr    r0, [r10, r4]          \n"
-        "ldr    r0, [r0]               \n"
-        "movs   r1, #0                 \n"
-        "movs   r2, #46                \n"
-        "movs   r3, #0                 \n"
-        "movs   r4, #0                 \n"
-        "svc    #12                    \n"
-        "b      .                      \n"
-        ".align 2                      \n"
-        ".L1:                          \n"
-        ".word riotVidt(GOT)           \n"
-        ".word nrf52_pip_handlers(GOT) \n"
-        ".word riotPartDesc(GOT)       \n"
+        /* void *intctx, *stkctx;                                  */
+        /* isr_t *handler;                                         */
+        /* vidt_t *vidt;                                           */
+        /* size_t intno;                                           */
+        /*                                                         */
+        /* extern vidt_t *riotVidt;                                */
+        /* vidt = riotVidt;                                        */
+        "ldr    r4, .L1                                           \n"
+        "ldr    r4, [r10, r4]                                     \n"
+        "ldr    r4, [r4]                                          \n"
+        /* intctx = vidt->contexts[9];                             */
+        "ldr    r5, [r4, #40]                                     \n"
+        /* XXX check if the context is corrupted                   */
+        /* if (*(uint32_t *)intctx == 0)                           */
+        "ldr    r6, [r5]                                          \n"
+        "cmp    r6, #0                                            \n"
+        "ittee  eq                                                \n"
+        /*     stkctx = (void *)(((extendedContext_t *)intctx)->   */
+        /*         frame.sp - 0x68);                               */
+        "ldreq  r6, [r5, #72]                                     \n"
+        "subeq  r6, #0x68                                         \n"
+        /* else                                                    */
+        /*     stkctx = (void *)(((basicContext_t *)intctx)->      */
+        /*         frame.sp - 0x20);                               */
+        "ldrne  r6, [r5, #8]                                      \n"
+        "subne  r6, #0x20                                         \n"
+        /* stkctx = (void *)((uintptr_t)stkctx & ~(0x4));          */
+        "bic    r6, #4                                            \n"
+        /* if (*(uint32_t *)intctx == 0)                           */
+        "ite    eq                                                \n"
+        /*     stkctx = (void *)((uintptr_t)stkctx - 108);         */
+        "subeq  r6, #108                                          \n"
+        /* else                                                    */
+        /*     stkctx = (void *)((uintptr_t)stkctx - 44);          */
+        "subne  r6, #44                                           \n"
+        /* ((basicContext_t *)stkctx)->pipflags =                  */
+        /*    ((basicContext_t *)intctx)->pipflags;                */
+        "ldr    r5, [r5, #4]                                      \n"
+        "str    r5, [r6, #4]                                      \n"
+        /* __asm__ volatile                                        */
+        /* (                                                       */
+        /*     "mov sp, %0"                                        */
+        /*     :                                                   */
+        /*     : "r" (stkctx)                                      */
+        /*     :                                                   */
+        /* );                                                      */
+        "mov    sp, r6                                            \n"
+        /* intno = vidt->currentInterrupt - 16;                    */
+        "ldr    r5, [r4]                                          \n"
+        "subs   r5, #16                                           \n"
+        /* handler = nrf52_pip_handlers[intno];                    */
+        "ldr    r6, .L1+4                                         \n"
+        "ldr    r6, [r10, r6]                                     \n"
+        "ldr    r6, [r6, r5, lsl #2]                              \n"
+        /* handler();                                              */
+        "blx    r6                                                \n"
+        /* Pip_setIntState(0);                                     */
+        "mov    r0, #0                                            \n"
+        "svc    #15                                               \n"
+        /* vidt->contexts[0] = stkctx;                             */
+        "str    sp, [r4, #4]                                      \n"
+        /* Pip_yield(riotPartDesc, 0, 46, 0, 0);                   */
+        "ldr    r4, .L1+8                                         \n"
+        "ldr    r0, [r10, r4]                                     \n"
+        "ldr    r0, [r0]                                          \n"
+        "movs   r1, #0                                            \n"
+        "movs   r2, #46                                           \n"
+        "movs   r3, #0                                            \n"
+        "movs   r4, #0                                            \n"
+        "svc    #12                                               \n"
+        /* for (;;);                                               */
+        "b      .                                                 \n"
+        ".align 2                                                 \n"
+        ".L1:                                                     \n"
+        ".word riotVidt(GOT)                                      \n"
+        ".word nrf52_pip_handlers(GOT)                            \n"
+        ".word riotPartDesc(GOT)                                  \n"
     );
 }
 
@@ -187,7 +241,10 @@ static basicContext_t nrf52_pip_ctx = {
     /* We must not be interrupted in exception handler. */
     .pipflags = 0,
     .frame = {
-        .sp = (uint32_t)dummy_stack + DUMMY_STACK_SIZE,
+        /* the SP field will be initialized in the
+         * start() function because its value will
+         * only be known at runtime */
+        .sp = 0,
         .r4 = 0,
         .r5 = 0,
         .r6 = 0,
@@ -220,8 +277,8 @@ static basicContext_t nrf52_pip_ctx = {
  */
 void nrf52_pip_ctx_init(void *sp, void *sl)
 {
-    (void)sp;
-    nrf52_pip_ctx.frame.r10 = (uint32_t) sl;
+    nrf52_pip_ctx.frame.sp = (uint32_t)sp;
+    nrf52_pip_ctx.frame.r10 = (uint32_t)sl;
 }
 
 /**

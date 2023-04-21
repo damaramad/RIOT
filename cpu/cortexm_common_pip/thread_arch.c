@@ -94,6 +94,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 
 #include "sched.h"
 #include "thread.h"
@@ -107,6 +108,9 @@
 extern void *riotPartDesc;
 extern void *riotGotAddr;
 extern vidt_t *riotVidt;
+
+/* XXX hack - see ble_ll_adv.c */
+uint32_t noyld = 0;
 
 /**
  * @brief   CPU core supports full Thumb instruction set
@@ -144,56 +148,61 @@ char *thread_stack_init(thread_task_func_t task_func,
                              void *stack_start,
                              int stack_size)
 {
-    uintptr_t sp = (uintptr_t)stack_start + (uintptr_t)stack_size;
+    basicContext_t *intctx, *stkctx;
+    void *sp, *spthd;
+
+    /* set sp to the stack top */
+    sp = (void *)((uintptr_t)stack_start +
+        (uintptr_t)stack_size);
 
     /* align sp to a four-byte boundary */
-    sp &= ~(0x3);
+    sp = (void *)(((uintptr_t)sp) & ~((uintptr_t)0x3));
 
-    sp -= sizeof(extendedContext_t);
-
-    void *ctx = (void *) sp;
+    /* reserved place for the interrupted context */
+    intctx = sp = (void *)((uintptr_t)sp -
+        sizeof(extendedContext_t));
 
     /* reserved place for the stack marker */
-    sp -= sizeof(void *);
-    *(uint32_t *) sp = STACK_MARKER;
-    sp -= sizeof(void *);
+    sp = (void *)((uintptr_t)sp - sizeof(void *));
+    *(uint32_t *)sp = STACK_MARKER;
 
+    sp = (void *)((uintptr_t)sp - sizeof(void *));
     /* align sp to a eight-byte boundray */
-    if ((sp & 0x7) != 0) {
+    if ((((uintptr_t)sp) & 0x7) != 0) {
         /* add a single word padding */
-        sp -= sizeof(void *);
-        *(uint32_t *) sp = ~((uint32_t)STACK_MARKER);
+        sp = (void *)((uintptr_t)sp - sizeof(void *));
+        *(uint32_t *)sp = ~((uint32_t)STACK_MARKER);
     }
+    spthd = sp;
 
-    void * initial_sp = (void *) sp;
+    /* reserved place for the stacked context */
+    stkctx = sp = (void *)((uintptr_t)sp -
+        sizeof(basicContext_t));
 
-    sp -= sizeof(basicContext_t);
+    /* initialize the interrupted context */
+    (void)memset(intctx, 0, sizeof(extendedContext_t));
+    intctx->isBasicFrame = 1;
+    intctx->pipflags = 1;
+    intctx->frame.r0 = (uint32_t)arg;
+    intctx->frame.r10 = (uint32_t)riotGotAddr;
+    intctx->frame.pc = (uint32_t)task_func;
+    intctx->frame.sp = (uint32_t)spthd;
+    intctx->frame.xpsr = INITIAL_XPSR;
 
-    void *ctx2 = (void *) sp;
+    /* initialize the stacked context */
+    (void)memset(stkctx, 0, sizeof(basicContext_t));
+    stkctx->isBasicFrame = 1;
+    stkctx->pipflags = 1;
+    stkctx->frame.r0 = (uint32_t)arg;
+    stkctx->frame.r10 = (uint32_t)riotGotAddr;
+    stkctx->frame.pc = (uint32_t)task_func;
+    stkctx->frame.sp = (uint32_t)spthd;
+    stkctx->frame.xpsr = INITIAL_XPSR;
 
-    for (size_t i = 0; i < EXTENDED_FRAME_SIZE; i++) {
-        ((extendedContext_t *)ctx)->frame.registers[i] = 0;
-    }
+    /* check stack overflow */
+    assert((uintptr_t)sp >= (uintptr_t)stack_start);
 
-    for (size_t i = 0; i < BASIC_FRAME_SIZE; i++) {
-        ((basicContext_t *)ctx2)->frame.registers[i] = 0;
-    }
-
-    ((basicContext_t *) ctx)->isBasicFrame  = 1;
-    ((basicContext_t *) ctx)->pipflags      = 1;
-    ((basicContext_t *) ctx)->frame.r0      = (uint32_t) arg;
-    ((basicContext_t *) ctx)->frame.r10     = (uint32_t) riotGotAddr;
-    ((basicContext_t *) ctx)->frame.pc      = (uint32_t) task_func;
-    ((basicContext_t *) ctx)->frame.sp      = (uint32_t) initial_sp;
-
-    ((basicContext_t *) ctx2)->isBasicFrame = 1;
-    ((basicContext_t *) ctx2)->pipflags     = 1;
-    ((basicContext_t *) ctx2)->frame.r0     = (uint32_t) arg;
-    ((basicContext_t *) ctx2)->frame.r10    = (uint32_t) riotGotAddr;
-    ((basicContext_t *) ctx2)->frame.pc     = (uint32_t) task_func;
-    ((basicContext_t *) ctx2)->frame.sp     = (uint32_t) initial_sp;
-
-    return (char *) sp;
+    return (char *)sp;
 }
 
 void thread_stack_print(void)
@@ -246,55 +255,65 @@ void NORETURN cpu_switch_context_exit(void)
 }
 
 #if CPU_CORE_CORTEXM_FULL_THUMB
-void __attribute__((used)) isr_pendsv(void) {
-    thread_t *thread;
-    uintptr_t addr;
-    void *ctx;
+void __attribute__((used)) isr_pendsv(void)
+{
+    void *intctx, *stkctx, *curctx = NULL;
+    thread_t *curthd, *newthd;
 
-    extern volatile thread_t *sched_active_thread;
-    void *active = (void *)sched_active_thread;
-
-    /* election of the thread to execute */
-    thread = sched_run();
-
-    if (active == thread) {
+    /* XXX hack - see ble_ll_adv.c */
+    if (noyld == 1)
         return;
+
+    /* elect the new thread to run */
+    curthd = thread_get_active();
+    if ((newthd = sched_run()) == curthd)
+        return;
+
+    /* retrieve current thread interrupted context */
+    if (curthd != NULL)
+        curctx = (void *)(((uintptr_t)curthd -
+            sizeof(extendedContext_t)) & ~(0x3));
+
+    /* retrieve new thread interrupted context */
+    intctx = (void *)(((uintptr_t)newthd -
+        sizeof(extendedContext_t)) & ~(0x3));
+
+    switch (*(uint32_t *)intctx) {
+    case 0: /* extended context */
+        /* update sp field of the new thread structure */
+        newthd->sp = (char *)(uintptr_t)
+            ((extendedContext_t *)intctx)->frame.sp;
+        /* retrieve stacked context */
+        stkctx = (void *)((((uintptr_t)newthd->sp -
+            0x68) & ~(0x4)) - 108);
+        /* sanity check */
+        assert(memcmp(&((extendedContext_t *)intctx)->frame,
+            &((extendedContext_t *)stkctx)->frame,
+            sizeof(extendedFrame_t)) == 0);
+        break;
+    case 1: /* basic context */
+        /* update sp field of the new thread structure */
+        newthd->sp = (char *)(uintptr_t)
+            ((basicContext_t *)intctx)->frame.sp;
+        /* retrieve stacked context */
+        stkctx = (void *)((((uintptr_t)newthd->sp -
+            0x20) & ~(0x4)) - 44);
+        /* sanity check */
+        assert(memcmp(&((basicContext_t *)intctx)->frame,
+            &((basicContext_t *)stkctx)->frame,
+            sizeof(basicFrame_t)) == 0);
+        break;
+    default: /* corrupted context */
+        assert(0);
     }
 
-    /* retrieve the address of the context stored on the
-     * stack of the elected thread */
-#if PICOLIBC_TLS
-    addr = (uintptr_t) thread->tls;
-#else
-    addr = (uintptr_t) thread;
-#endif
-    addr -= sizeof(extendedContext_t);
-    addr &= ~(0x3);
+    /* update riot vidt */
+    riotVidt->contexts[0] = stkctx;
+    riotVidt->contexts[9] = intctx;
+    riotVidt->contexts[47] = curctx;
 
-    /* update the stack pointer of the thread_t structure
-     * for consistency */
-    switch (*(uint32_t *) addr) {
-        case 0:
-            thread->sp = (char *)((extendedContext_t *) addr)->frame.sp;
-            ctx = (void *)((((uintptr_t)thread->sp - 0x68) & 0xfffffffb) - 108);
-            break;
-        case 1:
-            thread->sp = (char *)((basicContext_t *) addr)->frame.sp;
-            ctx = (void *)((((uintptr_t)thread->sp - 0x20) & 0xfffffffb) - 44);
-            break;
-        default:
-            /* XXX: corrupted context... what should we do? */
-            for (;;);
-    }
-
-    /* update the index 0 of the VIDT of RIOT with the
-     * address of the context of the elected thread */
-    riotVidt->contexts[0] = (void *) ctx;
-    riotVidt->contexts[9] = (void *) addr;
-
-    /* yield to the elected thread without saving the
-     * current context */
-    Pip_yield(riotPartDesc, 0, 46, 1, 1);
+    /* restore index 0 and save the current context at index 47 */
+    (void)Pip_yield(riotPartDesc, 0, 47, 1, 1);
 }
 #else /* CPU_CORE_CORTEXM_FULL_THUMB */
 void __attribute__((naked)) __attribute__((used)) isr_pendsv(void) {
@@ -460,7 +479,11 @@ void sched_arch_idle(void)
     void pm_set_lowest(void);
     pm_set_lowest();
 #else
-    /*__WFI();*/
+    /*
+     * XXX Implement the Pip_wfi system call to reduce power
+     *     consumption while waiting for interrupts.
+     */
+    /* __WFI(); */
 #endif
     /* Briefly re-enable IRQs to allow pending interrupts to be serviced and
      * have them update the runqueue */
