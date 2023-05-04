@@ -33,6 +33,12 @@ LINKER_SCRIPT ?= $(CPU_MODEL).ld
 LINKFLAGS += -T$(LINKER_SCRIPT) -Wl,--fatal-warnings
 
 LINKFLAGS += $(CFLAGS_CPU) $(CFLAGS_DBG) $(CFLAGS_OPT) -static -lgcc -nostartfiles
+# Disable the new '--warn-rwx-segments' linker warning introduced by
+# Binutils 2.39 causing the error: "warning: default.elf has a LOAD
+# segment with RWX permissions".
+ifeq ($(shell $(TARGET_ARCH)-ld --help | grep -q 'warn-rwx-segments'; echo $$?), 0)
+  LINKFLAGS += -Wl,--no-warn-rwx-segments
+endif
 LINKFLAGS += -Wl,--gc-sections
 LINKFLAGS += -Wl,-q
 
