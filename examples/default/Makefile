@@ -31,6 +31,12 @@ QUIET ?= 1
 USEMODULE += shell
 USEMODULE += shell_cmds_default
 USEMODULE += ps
+USEMODULE += shell_cmd_bgbin
+USEMODULE += shell_cmd_fgbin
+USEMODULE += shell_cmd_ldbin
+USEMODULE += shell_cmd_lsbin
+USEMODULE += shell_cmd_mkbin
+USEMODULE += shell_cmd_rmbin
 # include and auto-initialize all available sensors
 USEMODULE += saul_default
 
