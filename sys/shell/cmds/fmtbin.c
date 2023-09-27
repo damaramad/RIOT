@@ -11,24 +11,25 @@
  * @{
  *
  * @file
- * @brief       Shell command to run a binary in the foreground
+ * @brief       Shell command to format the file system
  *
  * @author      XXX
  *
  * @}
  */
 
+#include "gnrc_xipfs.h"
 #include "shell.h"
 
 static int
-_fgbin(int argc, char **argv)
+_fmtbin(int argc, char **argv)
 {
-	(void)argc;
-	(void)argv;
+    (void)argc;
+    (void)argv;
 
-	/* XXX */
+    tinyfs_format();
 
-	return 0;
+    return 0;
 }
 
-SHELL_COMMAND(fgbin, "run a binary in the foreground", _fgbin);
+SHELL_COMMAND(fmtbin, "format the file system", _fmtbin);
