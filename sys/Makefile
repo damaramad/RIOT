@@ -221,6 +221,9 @@ endif
 ifneq (,$(filter usbus usbus_%,$(USEMODULE)))
     DIRS += usb/usbus
 endif
+ifneq (,$(filter xipfs,$(USEMODULE)))
+  DIRS += fs/xipfs
+endif
 ifneq (,$(filter ztimer_core,$(USEMODULE)))
     DIRS += ztimer
 endif

@@ -61,7 +61,11 @@ static void _ls_usage(char **argv)
 static void _vfs_usage(char **argv)
 {
     printf("%s r <path> [bytes] [offset]\n", argv[0]);
+#ifdef MODULE_XIPFS
+    printf("%s w <path> <ascii|hex|b64> <a|o> <data>\n", argv[0]);
+#else
     printf("%s w <path> <ascii|hex> <a|o> <data>\n", argv[0]);
+#endif /* MODULE_XIPFS */
     printf("%s ls <path>\n", argv[0]);
     printf("%s cp <src> <dest>\n", argv[0]);
     printf("%s mv <src> <dest>\n", argv[0]);
@@ -84,14 +88,26 @@ static void _vfs_usage(char **argv)
     if (MOUNTPOINTS_NUMOF > 0) {
         printf("%s format [path]\n", argv[0]);
     }
+#ifdef MODULE_XIPFS
+    printf("%s mk: <name> <size> <exec>\n", argv[0]);
+    printf("%s exec: <file> [arg0] [arg1] ... [argn]\n", argv[0]);
+#endif /* MODULE_XIPFS */
     puts("r: Read [bytes] bytes at [offset] in file <path>");
+#ifdef MODULE_XIPFS
+    puts("w: Write (<a>: append, <o> overwrite) <ascii> or <hex> or <b64> string <data> in file <path>");
+#else
     puts("w: Write (<a>: append, <o> overwrite) <ascii> or <hex> string <data> in file <path>");
+#endif /* MODULE_XIPFS */
     puts("ls: List files in <path>");
     puts("mv: Move <src> file to <dest>");
     puts("mkdir: Create directory <path> ");
     puts("cp: Copy <src> file to <dest>");
     puts("rm: Unlink (delete) a file or a directory at <path>");
     puts("df: Show file system space utilization stats");
+#ifdef MODULE_XIPFS
+    puts("mk: allocate the space needed to load a file");
+    puts("exec: run a binary");
+#endif /* MODULE_XIPFS */
 }
 
 static void _print_size(uint64_t size)
@@ -321,6 +337,122 @@ static int _read_handler(int argc, char **argv)
     return 0;
 }
 
+#ifdef MODULE_XIPFS
+#include <limits.h>
+#include "fs/xipfs.h"
+
+static int convert(const char *str, uint32_t *val)
+{
+    char *endptr;
+    long l;
+
+    errno = 0;
+
+    l = strtol(str, &endptr, 10);
+
+    if (l == LONG_MIN && errno != 0) {
+        return -1;
+    }
+    if (l == LONG_MAX && errno != 0) {
+        return -1;
+    }
+    if (endptr == str) {
+        return -1;
+    }
+    if ((long unsigned int)l > UINT32_MAX) {
+        return -1;
+    }
+    if (l < 0) {
+        return -1;
+    }
+    if (*endptr != '\0') {
+        return -1;
+    }
+
+    *val = (uint32_t)l;
+
+    return 0;
+}
+
+static int _mk_handler(int argc, char **argv)
+{
+    uint32_t size, exec;
+    char *path;
+    int res;
+
+    if (argc < 4) {
+        printf("%s <name> <size> <exec>\n", argv[0]);
+        return 1;
+    }
+    path = argv[1];
+
+    res = vfs_normalize_path(path, path, strlen(path) + 1);
+    if (res < 0) {
+        printf("Invalid path \"%s\": %s\n", path,
+            tiny_strerror(res));
+        return 1;
+    }
+    res = convert(argv[2], &size);
+    if (res < 0) {
+        printf("Invalid size \"%s\": %s\n", argv[2],
+            tiny_strerror(res));
+        return 1;
+    }
+    res = convert(argv[3], &exec);
+    if (res < 0) {
+        printf("Invalid rights \"%s\": %s\n", argv[3],
+            tiny_strerror(res));
+        return 1;
+    }
+    if (exec != 0 && exec != 1) {
+        printf("Invalid rights \"%s\": %s\n", argv[3],
+            tiny_strerror(res));
+        return 1;
+    }
+
+    res = xipfs_new_file(path, size, exec);
+    if (res < 0) {
+        printf("Error creating file \"%s\": %s\n", path,
+            tiny_strerror(res));
+        return 1;
+    }
+
+    return 0;
+}
+
+static int _exec_handler(int argc, char **argv)
+{
+    char *path, *exec_argv[EXEC_ARGC_MAX];
+    int res, i;
+
+    if (argc < 2) {
+        printf("%s <file> [arg0] [arg1] ... [argn]\n", argv[0]);
+        return 1;
+    }
+    path = argv[1];
+
+    res = vfs_normalize_path(path, path, strlen(path) + 1);
+    if (res < 0) {
+        printf("Invalid path \"%s\": %s\n", path,
+            tiny_strerror(res));
+        return 1;
+    }
+    for (i = 1; i < argc && i < EXEC_ARGC_MAX; i++) {
+        exec_argv[i-1] = argv[i];
+    }
+    exec_argv[i-1] = NULL;
+
+    res = xipfs_execv(path, exec_argv);
+    if (res < 0) {
+        printf("Error executing file \"%s\": %s\n", path,
+            tiny_strerror(res));
+        return 1;
+    }
+
+    return 0;
+}
+#endif /* MODULE_XIPFS */
+
 static inline int _dehex(char c)
 {
     if ('0' <= c && c <= '9') {
@@ -337,13 +469,53 @@ static inline int _dehex(char c)
     }
 }
 
+typedef enum format_e {
+    ASCII,
+    HEX,
+#ifdef MODULE_XIPFS
+    B64,
+#endif /* MODULE_XIPFS */
+} format_t;
+
+#ifdef MODULE_XIPFS
+static inline int isb64char(char c)
+{
+    return (c >= 'A' && c <= 'Z') |
+           (c >= 'a' && c <= 'z') |
+           (c >= '0' && c <= '9') |
+           (c == '+')             |
+           (c == '/');
+}
+
+static inline int _deb64(char c)
+{
+    if (c >= 'A' && c <= 'Z') {
+        return c - 'A';
+    }
+    else if (c >= 'a' && c <= 'z') {
+        return 26 + (c - 'a');
+    }
+    else if (c >= '0' && c <= '9') {
+        return 52 + (c - '0');
+    }
+    else if (c == '+') {
+        return 62;
+    }
+    else if (c == '/') {
+        return 63;
+    } else {
+        return 0;
+    }
+}
+#endif /* MODULE_XIPFS*/
+
 static int _write_handler(int argc, char **argv)
 {
     char *w_buf;
     size_t nbytes = 0;
     size_t nb_str = 0;
     char *path = argv[1];
-    int ascii = 0;
+    format_t format;
     int flag = O_CREAT;
     if (argc < 2) {
         puts("vfs write: missing file name");
@@ -355,11 +527,16 @@ static int _write_handler(int argc, char **argv)
         return 1;
     }
     if (strcmp(argv[2], "ascii") == 0) {
-        ascii = 1;
+        format = ASCII;
     }
     else if (strcmp(argv[2], "hex") == 0) {
-        ascii = 0;
+        format = HEX;
     }
+#ifdef MODULE_XIPFS
+    else if (strcmp(argv[2], "b64") == 0) {
+        format = B64;
+    }
+#endif /* MODULE_XIPFS */
     else {
         printf("vfs write: unknown format: %s\n", argv[2]);
         return 1;
@@ -390,7 +567,7 @@ static int _write_handler(int argc, char **argv)
     /* in ascii mode, there could be spaces */
     /* we need the total number of strings to go through */
     nb_str = argc - 4;
-    if (!ascii) {
+    if (format == HEX) {
         /* sanity check: only hex digit and hex strings length must be even */
         for (size_t i = 0; i < nb_str; i++) {
             char c;
@@ -410,6 +587,43 @@ static int _write_handler(int argc, char **argv)
             }
         }
     }
+#ifdef MODULE_XIPFS
+    if (format == B64) {
+        for (size_t i = 0; i < nb_str; i++) {
+            char c;
+            size_t j = 0;
+            do {
+                c = argv[argc - nb_str + i][j];
+                j++;
+                if (c != '\0' && !isb64char((int)c)) {
+                    if (c != '=') {
+                        printf("Non-base 64 character: %c\n", c);
+                        return 6;
+                    }
+                    c = argv[argc - nb_str + i][j];
+                    j++;
+                    if (c != '\0') {
+                        if (c != '=') {
+                            puts("Expected a '=' padding character\n");
+                            return 6;
+                        }
+                        c = argv[argc - nb_str + i][j];
+                        j++;
+                        if (c != '\0') {
+                            puts("Expected an end-of-line character");
+                            return 6;
+                        }
+                    }
+                }
+            } while (c != '\0');
+            j--;
+            if (j % 4 != 0) {
+                puts("Invalid string length");
+                return 6;
+            }
+        }
+    }
+#endif /* MODULE_XIPFS */
 
     int res;
     res = vfs_normalize_path(path, path, strlen(path) + 1);
@@ -424,7 +638,7 @@ static int _write_handler(int argc, char **argv)
         return 3;
     }
 
-    if (ascii) {
+    if (format == ASCII) {
         while (nb_str > 0) {
             res = vfs_write(fd, w_buf, nbytes);
             if (res < 0) {
@@ -439,7 +653,7 @@ static int _write_handler(int argc, char **argv)
             }
         }
     }
-    else {
+    else if (format == HEX) {
         while (nb_str > 0) {
             w_buf = argv[argc - nb_str];
             nbytes = strlen(w_buf);
@@ -457,6 +671,50 @@ static int _write_handler(int argc, char **argv)
             nb_str--;
         }
     }
+#ifdef MODULE_XIPFS
+    else if (format == B64) {
+        while (nb_str > 0) {
+            uint32_t bytes, r;
+            char buf[3];
+            w_buf = argv[argc - nb_str];
+            nbytes = strlen(w_buf);
+            while (nbytes > 0) {
+                bytes = 0;
+                r = 3;
+                assert(w_buf[0] != '=');
+                bytes |= _deb64(w_buf[0]) << 18;
+                assert(w_buf[1] != '=');
+                bytes |= _deb64(w_buf[1]) << 12;
+                if (w_buf[2] != '=') {
+                    bytes |= _deb64(w_buf[2]) << 6;
+                } else {
+                    r--;
+                }
+                if (w_buf[3] != '=') {
+                    bytes |= _deb64(w_buf[3]);
+                } else {
+                    r--;
+                }
+                buf[0] = (bytes >> 16) & 0xff;
+                buf[1] = (bytes >>  8) & 0xff;
+                buf[2] = (bytes      ) & 0xff;
+                res = vfs_write(fd, buf, r);
+                if (res < 0) {
+                    printf("Write error: %s\n", tiny_strerror(res));
+                    vfs_close(fd);
+                    return 4;
+                }
+                w_buf += 4;
+                nbytes -= 4;
+            }
+            nb_str--;
+        }
+    }
+#endif /* MODULE_XIPFS */
+    else {
+        printf("error\n");
+        return -1;
+    }
 
     vfs_close(fd);
     return 0;
@@ -470,6 +728,19 @@ static int _cp_handler(int argc, char **argv)
     }
     char *src_name = argv[1];
     char *dest_name = argv[2];
+
+    int res;
+    res = vfs_normalize_path(src_name, src_name, strlen(src_name) + 1);
+    if (res < 0) {
+        printf("Invalid path \"%s\": %s\n", src_name, tiny_strerror(res));
+        return 5;
+    }
+    res = vfs_normalize_path(dest_name, dest_name, strlen(dest_name) + 1);
+    if (res < 0) {
+        printf("Invalid path \"%s\": %s\n", dest_name, tiny_strerror(res));
+        return 5;
+    }
+
     printf("%s: copy src: %s dest: %s\n", argv[0], src_name, dest_name);
 
     int fd_in = vfs_open(src_name, O_RDONLY, 0);
@@ -547,9 +818,21 @@ static int _mv_handler(int argc, char **argv)
     }
     char *src_name = argv[1];
     char *dest_name = argv[2];
+
+    int res;
+    res = vfs_normalize_path(src_name, src_name, strlen(src_name) + 1);
+    if (res < 0) {
+        printf("Invalid path \"%s\": %s\n", src_name, tiny_strerror(res));
+        return 5;
+    }
+    res = vfs_normalize_path(dest_name, dest_name, strlen(dest_name) + 1);
+    if (res < 0) {
+        printf("Invalid path \"%s\": %s\n", dest_name, tiny_strerror(res));
+        return 5;
+    }
     printf("%s: move src: %s dest: %s\n", argv[0], src_name, dest_name);
 
-    int res = vfs_rename(src_name, dest_name);
+    res = vfs_rename(src_name, dest_name);
     if (res < 0) {
         printf("mv ERR: %s\n", tiny_strerror(res));
         return 2;
@@ -569,8 +852,15 @@ static int _rm_handler(int argc, char **argv)
         return 1;
     }
     char *rm_name = recursive ? argv[2] : argv[1];
-    printf("%s: unlink: %s\n", argv[0], rm_name);
+
     int res;
+    res = vfs_normalize_path(rm_name, rm_name, strlen(rm_name) + 1);
+    if (res < 0) {
+        printf("Invalid path \"%s\": %s\n", rm_name, tiny_strerror(res));
+        return 5;
+    }
+    printf("%s: unlink: %s\n", argv[0], rm_name);
+
     if (IS_USED(MODULE_VFS_UTIL) && recursive) {
         char pbuf[SHELL_VFS_PATH_SIZE_MAX];
         res = vfs_unlink_recursive(rm_name, pbuf, sizeof(pbuf));
@@ -592,9 +882,16 @@ static int _mkdir_handler(int argc, char **argv)
         return 1;
     }
     char *dir_name = argv[1];
+
+    int res;
+    res = vfs_normalize_path(dir_name, dir_name, strlen(dir_name) + 1);
+    if (res < 0) {
+        printf("Invalid path \"%s\": %s\n", dir_name, tiny_strerror(res));
+        return 5;
+    }
     printf("%s: mkdir: %s\n", argv[0], dir_name);
 
-    int res = vfs_mkdir(dir_name, 0);
+    res = vfs_mkdir(dir_name, 0);
     if (res < 0) {
         printf("mkdir ERR: %s\n", tiny_strerror(res));
         return 2;
@@ -644,7 +941,13 @@ static int _ls_handler(int argc, char **argv)
             break;
         }
 
+#ifdef MODULE_XIPFS
+        size_t slash = path[strlen(path)-1] == '/';
+        snprintf(path_name, sizeof(path_name), "%s%s%s", path,
+            (slash == 1) ? "": "/", entry.d_name);
+#else
         snprintf(path_name, sizeof(path_name), "%s/%s", path, entry.d_name);
+#endif /* MODULE_XIPFS */
         vfs_stat(path_name, &stat);
         if (stat.st_mode & S_IFDIR) {
             printf("%s/\n", entry.d_name);
@@ -712,6 +1015,14 @@ static int _vfs_handler(int argc, char **argv)
     else if (MOUNTPOINTS_NUMOF > 0 && strcmp(argv[1], "format") == 0) {
         return _format_handler(argc - 1, &argv[1]);
     }
+#ifdef MODULE_XIPFS
+    else if (strcmp(argv[1], "mk") == 0) {
+        return _mk_handler(argc - 1, &argv[1]);
+    }
+    else if (strcmp(argv[1], "exec") == 0) {
+        return _exec_handler(argc - 1, &argv[1]);
+    }
+#endif /* MODULE_XIPFS */
     else {
         printf("vfs: unsupported sub-command \"%s\"\n", argv[1]);
         return 1;
@@ -905,4 +1216,5 @@ static int _vfs_sha256sum_cmd(int argc, char **argv)
 
 SHELL_COMMAND(sha256sum, "Compute and check SHA256 message digest", _vfs_sha256sum_cmd);
 #endif
+
 #endif

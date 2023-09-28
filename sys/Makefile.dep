@@ -417,6 +417,11 @@ ifneq (,$(filter devfs,$(USEMODULE)))
   USEMODULE += vfs
 endif
 
+ifneq (,$(filter xipfs,$(USEMODULE)))
+  USEMODULE += periph_flashpage
+  USEMODULE += vfs
+endif
+
 ifneq (,$(filter vfs_default,$(USEMODULE)))
   USEMODULE += vfs
 endif

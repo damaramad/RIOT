@@ -38,6 +38,9 @@ import argparse
 import re
 import codecs
 import platform
+import pathlib
+import base64
+import uuid
 
 try:
     serial.Serial
@@ -99,6 +102,13 @@ defaultprompt = '>'
 defaultrepeat_cmd_empty_line = True
 defaultreconnect = True
 
+# RIOT's default shell buffer size
+# see sys/include/shell.h
+SHELL_DEFAULT_BUFSIZE = 128 - 1
+
+# xipfs's default path length
+# see sys/include/fs/xipfs.h
+XIPFS_PATH_MAX = 64
 
 class SerCmd(cmd.Cmd):
     """Main class for pyterm based on Python's Cmd class.
@@ -314,11 +324,14 @@ class SerCmd(cmd.Cmd):
         self.logger.debug("%s is no pyterm command, sending to default "
                           "out" % line)
         for tok in line.split(';'):
-            tok = self.get_alias(tok)
-            if sys.version_info[0] == 2:
-                self.ser.write((tok.strip() + "\n").decode("utf-8").encode("utf-8"))
+            tok = self.get_alias(tok).strip()
+            # a special command interpreted by the host that
+            # enables the transfer of files from the host to an
+            # xipfs file system on the MCU
+            if tok.startswith('load'):
+                self.do_load(self, tok)
             else:
-                self.ser.write((tok.strip() + "\n").encode("utf-8"))
+                self.do_send(tok)
 
     def do_help(self, line):
         """Do not use Cmd's internal help function, but redirect to the
@@ -537,6 +550,47 @@ class SerCmd(cmd.Cmd):
                          % (cmd, interval))
         t = threading.Timer(interval, self.timer_handler, (cmd,))
         t.start()
+
+    def trunc(self, x, y):
+        """Truncates x to the previous multiple of y"""
+        return ((x) & ~((y) - 1))
+
+    def do_load(self, line):
+        """Transfers files from the host to an xipfs file system on the MCU"""
+        try:
+            argv = line.split(' ')
+            src, dst = argv[0], argv[1]
+            if len(dst) < XIPFS_PATH_MAX:
+                chklen = SHELL_DEFAULT_BUFSIZE
+                chklen -= len(f'vfs w {dst} b64 a ')
+                chklen = self.trunc(chklen, 4)
+                with open(src, 'rb') as f:
+                    data = f.read()
+                b64str = base64.b64encode(data).decode('ascii')
+                if pathlib.Path(src).suffix == '.bin':
+                    self.do_send(f'vfs mk {dst} {len(data)} 1')
+                else:
+                    self.do_send(f'vfs mk {dst} {len(data)} 0')
+                for chunk in [b64str[i:i+chklen] for i in range(0,len(b64str),chklen)]:
+                    self.do_send(f'vfs w {dst} b64 a {chunk}')
+            else:
+                print(f'pyterm: load: {dst}: name too long')
+        except FileNotFoundError:
+            print(f'pyterm: load: {src}: no such file')
+        except IndexError:
+            print(f'pyterm: load <src> <dst>')
+
+    def do_send(self, data):
+        """ """
+        if sys.version_info[0] == 2:
+            self.ser.write((data + "\n").decode("utf-8").encode("utf-8"))
+        else:
+            self.ser.write((data + "\n").encode("utf-8"))
+            # XXX: find a method to ensure that the command
+            # execution on the MCU side is complete before
+            # initiating another command. For the time being,
+            # using time.sleep(1) will suffice
+            time.sleep(1)
 
     def load_config(self):
         """Internal function to laod configuration from file.
