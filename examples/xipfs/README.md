@@ -215,9 +215,14 @@ ARG_2
 ARG_3
 ```
 
-### Adding new libc
+### Add new libc and RIOT functions to the syscall table
 
-TODO
+To enable the post-issuance software to access new functions of libc
+and/or RIOT, the following files must be edited:
+
+- `sys/fs/xipfs/file.c`
+- `example/xipfs/hello-world/stdriot/stdriot.c`
+- `example/xipfs/hello-world/stdriot/stdriot.h`
 
 ## Funding
 
