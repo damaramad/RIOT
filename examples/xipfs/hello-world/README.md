@@ -100,8 +100,8 @@ information like DWARF. However, we generate a `gdbinit` file that
 contains `symbol-file` and `add-symbol-file` instructions, which allow
 GDB to read additional symbol table information from the ELF file. The
 generated `gdbinit` file includes the actual memory addresses where the
-software sections were copied by the CRT0. Simply replace '# Set binary
-address in NVM here #' with the actual address where the binary is
+software sections were copied by the CRT0. Simply replace `# Set binary
+address in NVM here #` with the actual address where the binary is
 loaded. The file can be loaded with the `source gdbinit` command during
 a debugging session.
 
