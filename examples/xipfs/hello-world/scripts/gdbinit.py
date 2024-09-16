@@ -66,7 +66,7 @@ if __name__ == '__main__':
         with open(riot_path, 'rb') as f:
             xs = process_file(ELFFile(f), ['exec_ctx'])
         with open(soft_path, 'rb') as f:
-            ys = process_file(ELFFile(f), ['__gotSize', '__romRamSize'])
+            ys = process_file(ELFFile(f), ['__got_size', '__rom_ram_size'])
         rel_got_addr = xs[0] + OFFSET
         rel_rom_ram_addr = rel_got_addr + ys[0]
         rel_ram_addr = rel_rom_ram_addr + ys[1]

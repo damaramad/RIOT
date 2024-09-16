@@ -23,16 +23,16 @@ SECTIONS
     .rom :
     {
         . = ALIGN( 4 ) ;
-        __romStart = . ;
+        __rom_start = . ;
 
         *(.text*)
         . = ALIGN( 4 ) ;
         *(.rodata*)
 
         . = ALIGN( 4 ) ;
-        __romEnd = . ;
+        __rom_end = . ;
     }
-    __romSize = __romEnd - __romStart;
+    __rom_size = __rom_end - __rom_start;
 
     /*
      * The .got output section gathers all .got input sections
@@ -43,14 +43,14 @@ SECTIONS
     .got :
     {
         . = ALIGN( 4 ) ;
-        __gotStart = . ;
+        __got_start = . ;
 
         *(.got*)
 
         . = ALIGN( 4 ) ;
-        __gotEnd = . ;
+        __got_end = . ;
     }
-    __gotSize = __gotEnd - __gotStart;
+    __got_size = __got_end - __got_start;
 
     /*
      * The .rom.ram output section gathers all input sections
@@ -60,14 +60,14 @@ SECTIONS
     .rom.ram :
     {
         . = ALIGN( 4 ) ;
-        __romRamStart = . ;
+        __rom_ram_start = . ;
 
         *(.data*)
 
         . = ALIGN( 4 ) ;
-        __romRamEnd = . ;
+        __rom_ram_end = . ;
     }
-    __romRamSize = __romRamEnd - __romRamStart;
+    __rom_ram_size = __rom_ram_end - __rom_ram_start;
 
     /*
      * The .ram output section gathers all input sections with
@@ -77,12 +77,12 @@ SECTIONS
     .ram (NOLOAD) :
     {
         . = ALIGN( 4 ) ;
-        __ramStart = . ;
+        __ram_start = . ;
 
         *(.bss* COMMON)
 
         . = ALIGN( 4 ) ;
-        __ramEnd = . ;
+        __ram_end = . ;
     }
-    __ramSize = __ramEnd - __ramStart;
+    __ram_size = __ram_end - __ram_start;
 }

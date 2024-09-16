@@ -46,11 +46,11 @@ OBJCOPYFLAGS   += --output-target=binary
 # The order of the symbols matter, as it reflects the writing
 # order in the symbols.bin file
 SYMNAMES        = start
-SYMNAMES       += __romSize
-SYMNAMES       += __romRamSize
-SYMNAMES       += __ramSize
-SYMNAMES       += __gotSize
-SYMNAMES       += __romRamEnd
+SYMNAMES       += __rom_size
+SYMNAMES       += __rom_ram_size
+SYMNAMES       += __ram_size
+SYMNAMES       += __got_size
+SYMNAMES       += __rom_ram_end
 
 RELSECTIONS     = .rel.rom.ram
 

@@ -228,63 +228,63 @@ typedef enum err_msg_id_u {
  *
  * @brief Data structure that describes a symbol table
  */
-typedef struct symbolTable_s
+typedef struct symbol_table_s
 {
     /**
      * The entry point address within the partition
      */
-    uint32_t entryPoint;
+    uint32_t entry_point;
     /**
      * The .rom section size, in bytes, of the partition
      */
-    uint32_t romSecSize;
+    uint32_t rom_sec_size;
     /**
      * The .rom.ram section size, in bytes, of the partition
      */
-    uint32_t romRamSecSize;
+    uint32_t rom_ram_sec_size;
     /**
      * The .ram section size, in bytes, of the partition
      */
-    uint32_t ramSecSize;
+    uint32_t ram_sec_size;
     /**
      * The .got section size, in bytes, of the partition
      */
-    uint32_t gotSecSize;
+    uint32_t got_sec_size;
     /**
-     * The .romRam section end address of the partition
+     * The .rom.ram section end address of the partition
      */
-    uint32_t romRamEnd;
-} symbolTable_t;
+    uint32_t rom_ram_end;
+} symbol_table_t;
 
 /**
  * @internal
  *
  * @brief Data structure that describes a patch info entry
  */
-typedef struct patchinfoEntry_s
+typedef struct patchinfo_entry_s
 {
     /**
      * The pointer offest to patch
      */
-    uint32_t ptrOff;
-} patchinfoEntry_t;
+    uint32_t ptr_off;
+} patchinfo_entry_t;
 
 /**
  * @internal
  *
  * @brief Data structure that describes a path info table
  */
-typedef struct patchinfoTable_s
+typedef struct patchinfo_table_s
 {
     /**
      * The number of patchinfo entry
      */
-    uint32_t entryNumber;
+    uint32_t entry_number;
     /**
      * The patchinfo entries
      */
-    patchinfoEntry_t entries[];
-} patchinfoTable_t;
+    patchinfo_entry_t entries[];
+} patchinfo_table_t;
 
 /**
  * @internal
@@ -296,11 +296,11 @@ typedef struct metadata_s
     /**
      * The symbol table
      */
-    symbolTable_t symbolTable;
+    symbol_table_t symbol_table;
     /**
      * The patchinfo table
      */
-    patchinfoTable_t patchinfoTable;
+    patchinfo_table_t patchinfo_table;
 } metadata_t;
 
 /**
@@ -337,7 +337,7 @@ typedef struct crt0_ctx_s {
  *
  * @brief the offset of the metadata structure
  */
-extern uint32_t *__metadataOff;
+extern uint32_t *__metadata_off;
 
 /*
  * Fonction prototypes
@@ -366,58 +366,58 @@ static NAKED void die(err_msg_id_t id UNUSED);
 NORETURN void _start(crt0_ctx_t *ctx)
 {
     /* get memory layout */
-    uint32_t binaryAddr = (uint32_t)ctx->bin_base;
-    uint32_t unusedRamAddr = (uint32_t)ctx->ram_start;
-    uint32_t ramEndAddr = (uint32_t)ctx->ram_end;
+    uint32_t binary_addr = (uint32_t)ctx->bin_base;
+    uint32_t unused_ram_addr = (uint32_t)ctx->ram_start;
+    uint32_t ram_end_addr = (uint32_t)ctx->ram_end;
 
     /* get metadata */
     metadata_t *metadata = (metadata_t *)
-        (binaryAddr + (uint32_t) &__metadataOff);
-    uint32_t entryPointOffset = metadata->symbolTable.entryPoint;
-    uint32_t romSecSize = metadata->symbolTable.romSecSize;
-    uint32_t gotSecSize = metadata->symbolTable.gotSecSize;
-    uint32_t romRamSecSize = metadata->symbolTable.romRamSecSize;
-    uint32_t ramSecSize = metadata->symbolTable.ramSecSize;
+        (binary_addr + (uint32_t) &__metadata_off);
+    uint32_t entry_point_offset = metadata->symbol_table.entry_point;
+    uint32_t rom_sec_size = metadata->symbol_table.rom_sec_size;
+    uint32_t got_sec_size = metadata->symbol_table.got_sec_size;
+    uint32_t rom_ram_sec_size = metadata->symbol_table.rom_ram_sec_size;
+    uint32_t ram_sec_size = metadata->symbol_table.ram_sec_size;
 
     /* calculate section start address in ROM */
-    uint32_t romSecAddr =
-        (uint32_t) metadata + sizeof(metadata->symbolTable) +
-        sizeof(metadata->patchinfoTable.entryNumber) +
-        metadata->patchinfoTable.entryNumber *
-        sizeof(patchinfoEntry_t);
-    uint32_t gotSecAddr = romSecAddr + romSecSize;
-    uint32_t romRamSecAddr = gotSecAddr + gotSecSize;
-    uint32_t entryPointAddr = THUMB_ADDRESS(romSecAddr + entryPointOffset);
+    uint32_t rom_sec_addr =
+        (uint32_t) metadata + sizeof(metadata->symbol_table) +
+        sizeof(metadata->patchinfo_table.entry_number) +
+        metadata->patchinfo_table.entry_number *
+        sizeof(patchinfo_entry_t);
+    uint32_t got_sec_addr = rom_sec_addr + rom_sec_size;
+    uint32_t rom_ram_sec_addr = got_sec_addr + got_sec_size;
+    uint32_t entry_point_addr = THUMB_ADDRESS(rom_sec_addr + entry_point_offset);
 
     /* calculate relocated section start address in RAM */
-    uint32_t relGotSecAddr = unusedRamAddr;
-    uint32_t relRomRamSecAddr = relGotSecAddr + gotSecSize;
-    uint32_t relRamSecAddr = relRomRamSecAddr + romRamSecSize;
+    uint32_t rel_got_sec_addr = unused_ram_addr;
+    uint32_t rel_rom_ram_sec_addr = rel_got_sec_addr + got_sec_size;
+    uint32_t rel_ram_sec_addr = rel_rom_ram_sec_addr + rom_ram_sec_size;
 
     /* check if sufficient RAM is available for relocation */
-    if (relGotSecAddr + gotSecSize > ramEndAddr ||
-        relRomRamSecAddr + romRamSecSize > ramEndAddr ||
-        relRamSecAddr + ramSecSize > ramEndAddr) {
+    if (rel_got_sec_addr + got_sec_size > ram_end_addr ||
+        rel_rom_ram_sec_addr + rom_ram_sec_size > ram_end_addr ||
+        rel_ram_sec_addr + ram_sec_size > ram_end_addr) {
         die(ERR_MSG_ID_1);
     }
 
     /* update unused RAM value */
-    ctx->ram_start = (void *)(relRamSecAddr + ramSecSize);
+    ctx->ram_start = (void *)(rel_ram_sec_addr + ram_sec_size);
     /* Update unused ROM value */
     ctx->nvm_start = (void *)ROUND(
         (uintptr_t)ctx->nvm_start +
-        ((uint32_t)&__metadataOff) +
+        ((uint32_t)&__metadata_off) +
         sizeof(metadata_t) +
-        metadata->symbolTable.romRamEnd, 32);
+        metadata->symbol_table.rom_ram_end, 32);
 
     /* relocate .rom.ram section */
-    (void)memcpy((void *) relRomRamSecAddr,
-                 (void *) romRamSecAddr,
-                 (size_t) romRamSecSize);
+    (void)memcpy((void *) rel_rom_ram_sec_addr,
+                 (void *) rom_ram_sec_addr,
+                 (size_t) rom_ram_sec_size);
 
     /* initialize .ram section */
-    for (size_t i = 0; (i << 2) < ramSecSize; i++) {
-        ((uint32_t *) relRamSecAddr)[i] = 0;
+    for (size_t i = 0; (i << 2) < ram_sec_size; i++) {
+        ((uint32_t *) rel_ram_sec_addr)[i] = 0;
     }
 
     /* 
@@ -426,33 +426,33 @@ NORETURN void _start(crt0_ctx_t *ctx)
      * - originally relative to the binary file's start - to
      * the new memory addresses where they are now located
      */
-    for (size_t i = 0; (i << 2) < gotSecSize; i++) {
-        uint32_t off = ((uint32_t *) gotSecAddr)[i];
+    for (size_t i = 0; (i << 2) < got_sec_size; i++) {
+        uint32_t off = ((uint32_t *) got_sec_addr)[i];
         uint32_t addr = 0;
-        if (off < romSecSize) {
-            addr = romSecAddr + off;
-            goto validGotEntry;
+        if (off < rom_sec_size) {
+            addr = rom_sec_addr + off;
+            goto valid_got_entry;
         }
-        off -= romSecSize;
-        if (off < gotSecSize) {
+        off -= rom_sec_size;
+        if (off < got_sec_size) {
             /* offset must always be zero for the
              * _rom_size symbol */
-            addr = relGotSecAddr + off;
-            goto validGotEntry;
+            addr = rel_got_sec_addr + off;
+            goto valid_got_entry;
         }
-        off -= gotSecSize;
-        if (off < romRamSecSize) {
-            addr = relRomRamSecAddr + off;
-            goto validGotEntry;
+        off -= got_sec_size;
+        if (off < rom_ram_sec_size) {
+            addr = rel_rom_ram_sec_addr + off;
+            goto valid_got_entry;
         }
-        off -= romRamSecSize;
-        if (off < ramSecSize) {
-            addr = relRamSecAddr + off;
-            goto validGotEntry;
+        off -= rom_ram_sec_size;
+        if (off < ram_sec_size) {
+            addr = rel_ram_sec_addr + off;
+            goto valid_got_entry;
         }
         die(ERR_MSG_ID_2);
-validGotEntry:
-        ((uint32_t *) relGotSecAddr)[i] = addr;
+valid_got_entry:
+        ((uint32_t *) rel_got_sec_addr)[i] = addr;
     }
 
     /*
@@ -460,55 +460,55 @@ validGotEntry:
      * address of the value it points to the corresponding
      * relocated pointer address
      */
-    for (size_t i = 0; i < metadata->patchinfoTable.entryNumber; i++) {
-        uint32_t ptrOff = metadata->patchinfoTable.entries[i].ptrOff;
-        uint32_t off = *((uint32_t *)(romSecAddr + ptrOff));
-        uint32_t ptrAddr = 0, addr = 0;
-        if (ptrOff < romSecSize) {
-            goto ptrOffInRom;
+    for (size_t i = 0; i < metadata->patchinfo_table.entry_number; i++) {
+        uint32_t ptr_off = metadata->patchinfo_table.entries[i].ptr_off;
+        uint32_t off = *((uint32_t *)(rom_sec_addr + ptr_off));
+        uint32_t ptr_addr = 0, addr = 0;
+        if (ptr_off < rom_sec_size) {
+            goto ptr_off_in_rom;
         }
-        ptrOff -= romSecSize;
-        if (ptrOff < gotSecSize) {
-            goto offInGot;
+        ptr_off -= rom_sec_size;
+        if (ptr_off < got_sec_size) {
+            goto off_in_got;
         }
-        ptrOff -= gotSecSize;
-        if (ptrOff < romRamSecSize) {
-            ptrAddr = relRomRamSecAddr + ptrOff;
-            goto validPtrAddr;
+        ptr_off -= got_sec_size;
+        if (ptr_off < rom_ram_sec_size) {
+            ptr_addr = rel_rom_ram_sec_addr + ptr_off;
+            goto valid_ptr_addr;
         }
-        ptrOff -= romRamSecSize;
-        if (ptrOff < ramSecSize) {
-            ptrAddr = relRamSecAddr + ptrOff;
-            goto validPtrAddr;
+        ptr_off -= rom_ram_sec_size;
+        if (ptr_off < ram_sec_size) {
+            ptr_addr = rel_ram_sec_addr + ptr_off;
+            goto valid_ptr_addr;
         }
-        goto offOutBounds;
-validPtrAddr:
-        if (off < romSecSize) {
-            addr = romSecAddr + off;
-            goto validAddr;
+        goto off_out_bounds;
+valid_ptr_addr:
+        if (off < rom_sec_size) {
+            addr = rom_sec_addr + off;
+            goto valid_addr;
         }
-        off -= romSecSize;
-        if (off < gotSecSize) {
-            goto offInGot;
+        off -= rom_sec_size;
+        if (off < got_sec_size) {
+            goto off_in_got;
         }
-        off -= gotSecSize;
-        if (off < romRamSecSize) {
-            addr = relRomRamSecAddr + off;
-            goto validAddr;
+        off -= got_sec_size;
+        if (off < rom_ram_sec_size) {
+            addr = rel_rom_ram_sec_addr + off;
+            goto valid_addr;
         }
-        off -= romRamSecSize;
-        if (off < ramSecSize) {
-            addr = relRamSecAddr + off;
-            goto validAddr;
+        off -= rom_ram_sec_size;
+        if (off < ram_sec_size) {
+            addr = rel_ram_sec_addr + off;
+            goto valid_addr;
         }
-offOutBounds:
+off_out_bounds:
         die(ERR_MSG_ID_2);
-ptrOffInRom:
+ptr_off_in_rom:
         die(ERR_MSG_ID_3);
-offInGot:
+off_in_got:
         die(ERR_MSG_ID_4);
-validAddr:
-        *((uint32_t *) ptrAddr) = addr;
+valid_addr:
+        *((uint32_t *) ptr_addr) = addr;
     }
 
     /*
@@ -524,8 +524,8 @@ validAddr:
         "   bx     %2     \n"
         :
         : "r" (ctx),
-          "r" (relGotSecAddr),
-          "r" (entryPointAddr)
+          "r" (rel_got_sec_addr),
+          "r" (entry_point_addr)
         : "r0", "r1", "sl"
     );
 

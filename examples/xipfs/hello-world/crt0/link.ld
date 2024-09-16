@@ -21,6 +21,6 @@ SECTIONS
         . = ALIGN( 4 ) ;
         *(.text*)
         . = ALIGN( 4 ) ;
-        __metadataOff = . ;
+        __metadata_off = . ;
     }
 }
