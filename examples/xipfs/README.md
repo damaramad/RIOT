@@ -105,7 +105,7 @@ versions have not been tested.
 
 ### Building RIOT with `xipfs`
 
-To build RIOT with `xipfs, execute the following command from the
+To build RIOT with `xipfs`, execute the following command from the
 current directory:
 
 ```console
