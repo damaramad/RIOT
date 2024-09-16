@@ -25,6 +25,9 @@
 extern "C" {
 #endif
 
+/*
+ * Keep the prototypes in alphabetical order
+ */
 extern void exit(int status);
 extern int printf(const char * format, ...);
 
