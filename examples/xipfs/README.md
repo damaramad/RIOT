@@ -80,19 +80,19 @@ correctly.
 The following commands are available for managing files in an `xipfs`
 mount point:
 
-| Command    | Arguments                                   | Description                                                                                             |
-|------------|---------------------------------------------|---------------------------------------------------------------------------------------------------------|
-| `vfs r`    | `<path>` `[bytes]` `[offset]`               | Read `[bytes]` bytes at `[offset]` in file `<path>`                                                     |
-| `vfs w`    | `<path>` `<ascii|hex|b64>` `<a|o>` `<data>` | Write (`<a>`: append, `<o>` overwrite) `<ascii>` or `<hex>` or `<b64>` string `<data>` in file `<path>` |
-| `vfs ls`   | `<path>`                                    | List files in `<path>`                                                                                  |
-| `vfs cp`   | `<src>` `<dest>`                            | Copy `<src>` file to `<dest>`                                                                           |
-| `vfs mv`   | `<src>` `<dest>`                            | Move `<src>` file to `<dest>`                                                                           |
-| `vfs mkdir`| `<path>`                                    | Create directory `<path>`                                                                               |
-| `vfs rm`   | `<path>`                                    | Unlink (delete) a file or a directory at `<path>`                                                       |
-| `vfs df`   | `[path]`                                    | Show file system space utilization stats                                                                |
-| `vfs mk`   | `<name>` `<size>` `<exec>`                  | Allocate the space needed to load a file                                                                |
-| `vfs exec` | `<file>` `[arg0]` `[arg1]` `...` `[argn]`   | Run a binary                                                                                            |
-| `load`     | `<src>` `<dst>`                             | Loads a binary from the host `<src>` path to the MCU `<dst>` path                                       |
+| Command    | Arguments                                      | Description                                                                                             |
+|------------|------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| `vfs r`    | `<path>` `[bytes]` `[offset]`                  | Read `[bytes]` bytes at `[offset]` in file `<path>`                                                     |
+| `vfs w`    | `<path>` `<ascii\|hex\|b64>` `<a\|o>` `<data>` | Write (`<a>`: append, `<o>` overwrite) `<ascii>` or `<hex>` or `<b64>` string `<data>` in file `<path>` |
+| `vfs ls`   | `<path>`                                       | List files in `<path>`                                                                                  |
+| `vfs cp`   | `<src>` `<dest>`                               | Copy `<src>` file to `<dest>`                                                                           |
+| `vfs mv`   | `<src>` `<dest>`                               | Move `<src>` file to `<dest>`                                                                           |
+| `vfs mkdir`| `<path>`                                       | Create directory `<path>`                                                                               |
+| `vfs rm`   | `<path>`                                       | Unlink (delete) a file or a directory at `<path>`                                                       |
+| `vfs df`   | `[path]`                                       | Show file system space utilization stats                                                                |
+| `vfs mk`   | `<name>` `<size>` `<exec>`                     | Allocate the space needed to load a file                                                                |
+| `vfs exec` | `<file>` `[arg0]` `[arg1]` `...` `[argn]`      | Run a binary                                                                                            |
+| `load`     | `<src>` `<dst>`                                | Loads a binary from the host `<src>` path to the MCU `<dst>` path                                       |
 
 ## Getting started
 
