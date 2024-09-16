@@ -240,7 +240,7 @@ and/or RIOT, the following files must be edited:
 - Add the prototype of your system call to the list of already existing
   prototypes while ensuring to maintain alphabetical order.
 
-3. [file.c](/sys/fs/xipfs/file.c)
+3. [file.c](/sys/fs/xipfs/file.c):
 
 - Edit the enumeration `syscall_index_e` by adding an index for the new
   function in the format `SYSCALL_XXX`, where `XXX` is the name of the
