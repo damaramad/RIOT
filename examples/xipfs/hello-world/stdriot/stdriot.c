@@ -120,6 +120,10 @@ typedef struct crt0_ctx_s {
 /**
  * @internal
  *
+ * @warning The order of the members in the enumeration must
+ * remain synchronized with the order of the members of the same
+ * enumeration declared in file sys/fs/xipfs/file.c
+ *
  * @brief An enumeration describing the index of the functions
  * of the libc and RIOT in the system call table
  *
