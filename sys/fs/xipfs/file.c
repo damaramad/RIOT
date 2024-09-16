@@ -245,7 +245,7 @@ char *xipfs_infos_file = ".xipfs_infos";
  * @param status The exit(3) status of the binary is stored in
  * the R0 register
  */
-static void NAKED xipfs_exit(int status UNUSED)
+static void NAKED _exec_exit(int status UNUSED)
 {
     __asm__ volatile
     (
@@ -258,13 +258,13 @@ static void NAKED xipfs_exit(int status UNUSED)
 /**
  * @internal
  *
- * @note This function has the same prototype as the xipfs_exit
+ * @note This function has the same prototype as the _exec_exit
  * function
  *
  * @brief Starts the execution of the binary in the current RIOT
  * thread
  */
-static void NAKED xipfs_start(int status UNUSED)
+static void NAKED _exec_start(int status UNUSED)
 {
     __asm__ volatile
     (
@@ -351,7 +351,7 @@ static void exec_arguments_init(exec_ctx_t *ctx, char *const argv[])
  */
 static void exec_syscall_table_init(exec_ctx_t *ctx)
 {
-    ctx->syscall_table[SYSCALL_EXIT] = xipfs_exit;
+    ctx->syscall_table[SYSCALL_EXIT] = _exec_exit;
     ctx->syscall_table[SYSCALL_PRINTF] = vprintf;
 }
 
@@ -854,7 +854,7 @@ int xipfs_file_exec(xipfs_file_t *filp, char *const argv[])
     exec_arguments_init(&exec_ctx, argv);
     exec_syscall_table_init(&exec_ctx);
     _exec_entry_point = thumb(&filp->buf[0]);
-    xipfs_start(0);
+    _exec_start(0);
 
     return 0;
 }
