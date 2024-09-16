@@ -98,7 +98,15 @@ gdbinit: scripts/gdbinit.py ../bin/dwm1001/xipfs.elf $(TARGET).bin
             $$(($$(wc -c < $(TARGET)-raw.bin)-$$(wc -c < partition.bin))) > $@
 
 clean:
-	$(RM) main.o stdriot/stdriot.o $(TARGET)-raw.bin padding.bin crt0.bin symbols.bin relocation.bin partition.bin
+	$(RM)\
+            main.o\
+            stdriot/stdriot.o\
+            $(TARGET)-raw.bin\
+            padding.bin\
+            crt0.bin\
+            symbols.bin\
+            relocation.bin\
+            partition.bin
 	make -C crt0 clean
 
 realclean: clean
