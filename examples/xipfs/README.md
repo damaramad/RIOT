@@ -220,9 +220,35 @@ ARG_3
 To enable the post-issuance software to access new functions of libc
 and/or RIOT, the following files must be edited:
 
-- `sys/fs/xipfs/file.c`
-- `example/xipfs/hello-world/stdriot/stdriot.c`
-- `example/xipfs/hello-world/stdriot/stdriot.h`
+1. [examples/xipfs/hello-world/stdriot/stdriot.c](/examples/xipfs/hello-world/stdriot.c):
+
+- Edit the enumeration `syscall_index_e` by adding an index for the new
+  function in the format `SYSCALL_XXX`, where `XXX` is the name of the
+  syscall in uppercase.
+
+- Declare a type for the prototype of the syscall to be added in the
+  format `XXX_t`, where `XXX` is the name of the syscall in uppercase.
+
+- Duplicate one of the existing wrappers by substituting the wrapper's
+  prototype with that of the new system call to be added. Change the
+  type of the `func` pointer to match the type of the previously created
+  system call, and update the index in the `syscall_table` to reflect
+  the index of the newly created system call.
+
+2. [examples/xipfs/hello-world/stdriot/stdriot.h](/examples/xipfs/hello-world/stdriot.h):
+
+- Add the prototype of your system call to the list of already existing
+  prototypes while ensuring to maintain alphabetical order.
+
+3. [sys/fs/xipfs/file.c](/sys/fs/xipfs/file.c)
+
+- Edit the enumeration `syscall_index_e` by adding an index for the new
+  function in the format `SYSCALL_XXX`, where `XXX` is the name of the
+  syscall in uppercase.
+
+- In the `exec_syscall_table_init` function, which initializes the
+  system call table, add the address of your system call at the
+  corresponding index in the `syscall_table`.
 
 ## Funding
 
