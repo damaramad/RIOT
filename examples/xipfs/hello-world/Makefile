@@ -43,7 +43,7 @@ endif
 OBJCOPYFLAGS    = --input-target=elf32-littlearm
 OBJCOPYFLAGS   += --output-target=binary
 
-# The sprder of the symbols matter, as it reflects the writing
+# The order of the symbols matter, as it reflects the writing
 # order in the symbols.bin file
 SYMNAMES        = start
 SYMNAMES       += __romSize
