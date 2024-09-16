@@ -42,18 +42,6 @@
 /**
  * @internal
  *
- * @def XIPFS_SYSCALL_TABLE_MAX
- *
- * @brief Maximum size of the syscall table used by the
- * relocatable binary
- *
- * @see sys/fs/xipfs/file.c
- */
-#define XIPFS_SYSCALL_TABLE_MAX (2)
-
-/**
- * @internal
- *
  * @def XIPFS_FREE_RAM_SIZE
  *
  * @brief Amount of free RAM available for the relocatable
@@ -132,6 +120,31 @@ typedef struct crt0_ctx_s {
 /**
  * @internal
  *
+ * @brief An enumeration describing the index of the functions
+ * of the libc and RIOT in the system call table
+ *
+ * @see sys/fs/xipfs/file.c
+ */
+enum syscall_index_e {
+    /**
+     * Index of exit(3)
+     */
+    SYSCALL_EXIT,
+    /**
+     * Index of printf(3)
+     */
+    SYSCALL_PRINTF,
+    /**
+     * Maximum size of the syscall table used by the relocatable
+     * binary. It must remain the final element of the
+     * enumeration
+     */
+    SYSCALL_MAX,
+};
+
+/**
+ * @internal
+ *
  * @brief Data structure that describes the execution context of
  * a relocatable binary
  *
@@ -164,7 +177,7 @@ typedef struct exec_ctx_s {
      * Table of function pointers for the libc and RIOT
      * functions used by the relocatable binary
      */
-    void *syscall_table[XIPFS_SYSCALL_TABLE_MAX];
+    void *syscall_table[SYSCALL_MAX];
     /**
      * Reserved memory space in RAM for the free RAM to be used
      * by the relocatable binary
@@ -175,25 +188,6 @@ typedef struct exec_ctx_s {
      */
     char ram_end;
 } exec_ctx_t;
-
-/**
- * @internal
- *
- * @brief An enumeration describing the index of the functions
- * of the libc and RIOT in the system call table
- *
- * @see sys/fs/xipfs/file.c
- */
-enum syscall_index_e {
-    /**
-     * Index of exit(3)
-     */
-    SYSCALL_EXIT,
-    /**
-     * Index of printf(3)
-     */
-    SYSCALL_PRINTF,
-};
 
 /*
  * Internal types
