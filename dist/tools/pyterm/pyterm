@@ -581,7 +581,7 @@ class SerCmd(cmd.Cmd):
             print(f'pyterm: load <src> <dst>')
 
     def do_send(self, data):
-        """ """
+        """Send a command through the serial link"""
         if sys.version_info[0] == 2:
             self.ser.write((data + "\n").decode("utf-8").encode("utf-8"))
         else:
