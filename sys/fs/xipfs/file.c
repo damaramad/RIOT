@@ -89,6 +89,22 @@
 #define UNUSED __attribute__((unused))
 #endif /* !__GNUC__ */
 
+#ifndef __GNUC__
+#error "sys/fs/file: Your compiler does not support GNU extensions"
+#else
+
+/**
+ * @internal
+ *
+ * @def USED
+ *
+ * @brief Indicates that the specified static variable is to be
+ * retained in the object file, even if it is unreferenced
+ */
+#define USED __attribute__((used))
+
+#endif /* !__GNUC__ */
+
 /*
  * Internal structure
  */
@@ -225,7 +241,7 @@ static void *_exec_entry_point;
  * @brief A reference to the stack's state prior to invoking
  * execv(2)
  */
-static void *_exec_curr_stack __attribute__((used));
+static void *_exec_curr_stack USED;
 
 /**
  * @brief A pointer to a virtual file name
