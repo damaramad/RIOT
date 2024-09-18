@@ -420,7 +420,7 @@ static int already_display(vfs_DIR *dirp,
         /* one file at least */
         do {
             if (curp == filp) {
-                /* not already dump */
+                /* not already display */
                 break;
             }
             i = 0;
@@ -449,14 +449,14 @@ static int already_display(vfs_DIR *dirp,
                     return -1;
                 }
                 if (curp->path[i] == filp->path[i]) {
-                    /* already dump */
+                    /* already display */
                     return 0;
                 }
             }
         } while ((curp = xipfs_fs_next(curp)) != NULL);
     }
 
-    /* not already dump */
+    /* not already display */
     return -1;
 }
 
