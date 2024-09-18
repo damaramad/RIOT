@@ -214,7 +214,7 @@ typedef struct exec_ctx_s {
  *
  * @brief The execution context of a relocatable binary
  */
-static exec_ctx_t exec_ctx;
+static exec_ctx_t exec_ctx USED;
 
 /**
  * @internal
@@ -222,7 +222,7 @@ static exec_ctx_t exec_ctx;
  * @brief A pointer to the first instructure to execute in the
  * relocatable binary
  */
-static void *_exec_entry_point;
+static void *_exec_entry_point USED;
 
 /**
  * @internal
