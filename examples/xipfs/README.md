@@ -49,24 +49,31 @@ execution, allowing the binary to call these functions.
 
 `xipfs` has the following limitations:
 
-- No journaling: Without journaling, the file system cannot keep track
-  of changes in a way that allows for recovery in the event of a crash or
-  power failure. This can lead to data corruption and loss.
+- No journaling: `xipfs` doesn't provide journaling. Without journaling,
+  the file system cannot keep track of changes in a way that allows for
+  recovery in the event of a crash or power failure. This can lead to
+  data corruption and loss.
 
-- No checksums: The lack of checksums means that the file system cannot
-  verify the integrity of files. This increases the risk of undetected
-  data corruption, as there is no mechanism to ensure that files have not
-  been altered or damaged.
+- No checksums: `xipfs` doesn't provide checksums. The lack of checksums
+  means that the file system cannot verify the integrity of files. This
+  increases the risk of undetected data corruption, as there is no
+  mechanism to ensure that files have not been altered or damaged.
 
-- Global file system lock: A global file system lock can lead to
-  performance bottlenecks, as it prevents multiple threads from accessing
-  the file system simultaneously.
+- Global file system lock: `xipfs` needs a global file system lock. A
+  global file system lock can lead to performance bottlenecks, as it
+  prevents multiple threads from accessing the file system
+  simultaneously.
 
-- Fixed file size: By default, a file created using `vfs_open(2)` has a
-  fixed space reserved in flash that is the size of a flash page. This
-  size cannot be extended later. To create a file larger than the fixed
-  size of one flash page, the `mk(1)` command or the `xipfs_new_file(3)`
-  function must be used.
+- Fixed file size: `xipfs` provide fixed file size. By default, a file
+  created using `vfs_open(2)` has a fixed space reserved in flash that
+  is the size of a flash page. This size cannot be extended later. To
+  create a file larger than the fixed size of one flash page, the
+  `mk(1)` command or the `xipfs_new_file(3)` function must be used.
+
+- Limited character set: `xipfs` supports only a subset of 7-bit ASCII
+  characters, specifically `[0-9A-Za-z\/\.\-_]`.
+
+- Limited path length: `xipfs` maximum path length is 64 characters.
 
 ## Tested cards
 
